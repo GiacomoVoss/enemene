@@ -1,0 +1,49 @@
+[2020-07-08 14:00:56] DEBUG: Log level: DEBUG
+[2020-07-08 14:00:56] DEBUG: Executing (default): SELECT 1+1 AS result
+[2020-07-08 14:00:56] INFO:  [RouterService] Loaded 0 paths.
+[2020-07-08 14:00:56] INFO:  [ViewService] Imported 0 Views.
+[2020-07-08 14:00:56] DEBUG: Executing (default): SELECT `id`, `createdAt`, `updatedAt` FROM `DataObjects` AS `RoutePermission`;
+[2020-07-08 14:00:56] DEBUG: Executing (default): SELECT `id`, `createdAt`, `updatedAt` FROM `DataObjects` AS `ViewPermission`;
+[2020-07-08 14:01:32] DEBUG: Log level: DEBUG
+[2020-07-08 14:01:33] DEBUG: Executing (default): SELECT 1+1 AS result
+[2020-07-08 14:01:33] INFO:  [RouterService] Loaded 0 paths.
+[2020-07-08 14:01:33] INFO:  [ViewService] Imported 0 Views.
+[2020-07-08 14:01:33] DEBUG: Executing (default): SELECT `id`, `createdAt`, `updatedAt` FROM `DataObjects` AS `RoutePermission`;
+[2020-07-08 14:01:33] DEBUG: Executing (default): SELECT `id`, `createdAt`, `updatedAt` FROM `DataObjects` AS `ViewPermission`;
+[2020-07-08 14:01:59] DEBUG: Log level: DEBUG
+[2020-07-08 14:01:59] DEBUG: Executing (default): SELECT 1+1 AS result
+[2020-07-08 14:01:59] INFO:  [RouterService] Loaded 0 paths.
+[2020-07-08 14:01:59] INFO:  [ViewService] Imported 0 Views.
+[2020-07-08 14:01:59] DEBUG: Executing (default): SELECT `id`, `createdAt`, `updatedAt` FROM `DataObjects` AS `RoutePermission`;
+[2020-07-08 14:01:59] DEBUG: Executing (default): SELECT `id`, `createdAt`, `updatedAt` FROM `DataObjects` AS `ViewPermission`;
+[2020-07-08 14:02:57] DEBUG: Log level: DEBUG
+[2020-07-08 14:02:57] DEBUG: Executing (default): SELECT 1+1 AS result
+[2020-07-08 14:02:57] INFO:  [RouterService] Loaded 0 paths.
+[2020-07-08 14:02:57] INFO:  [ViewService] Imported 0 Views.
+[2020-07-08 14:03:25] DEBUG: Log level: DEBUG
+[2020-07-08 14:03:25] DEBUG: Executing (default): SELECT 1+1 AS result
+[2020-07-08 14:03:25] INFO:  [RouterService] Loaded 0 paths.
+[2020-07-08 14:03:25] INFO:  [ViewService] Imported 0 Views.
+[2020-07-08 14:03:58] DEBUG: Log level: DEBUG
+[2020-07-08 14:03:58] DEBUG: Executing (default): SELECT 1+1 AS result
+[2020-07-08 14:03:58] INFO:  [RouterService] Loaded 0 paths.
+[2020-07-08 14:03:58] INFO:  [ViewService] Imported 0 Views.
+[2020-07-08 14:03:58] DEBUG: Executing (default): SELECT `id`, `route`, `method`, `createdAt`, `updatedAt`, `roleId` FROM `route_permission` AS `RoutePermission`;
+[2020-07-08 14:03:58] DEBUG: Executing (default): SELECT `id`, `view`, `permissions`, `createdAt`, `updatedAt`, `roleId` FROM `view_permission` AS `ViewPermission`;
+[2020-07-08 14:05:34] DEBUG: Log level: DEBUG
+[2020-07-08 14:05:34] DEBUG: Executing (default): SELECT 1+1 AS result
+[2020-07-08 14:05:34] INFO:  [RouterService] Loaded 0 paths.
+[2020-07-08 14:05:34] INFO:  [ViewService] Imported 0 Views.
+[2020-07-08 14:05:34] DEBUG: Executing (default): SELECT `id`, `route`, `method`, `createdAt`, `updatedAt`, `roleId` FROM `route_permission` AS `RoutePermission`;
+[2020-07-08 14:05:34] DEBUG: Executing (default): SELECT `id`, `view`, `permissions`, `createdAt`, `updatedAt`, `roleId` FROM `view_permission` AS `ViewPermission`;
+[2020-07-08 14:05:34] WARN:  [PermissionService] Permission 4722479a-7033-4bb2-adfa-ec901c53e171 applies to non-existing view "UsersView".
+[2020-07-08 14:05:55] DEBUG: Log level: DEBUG
+[2020-07-08 14:05:55] DEBUG: Executing (default): SELECT 1+1 AS result
+[2020-07-08 14:05:55] INFO:  [RouterService] Loaded 0 paths.
+[2020-07-08 14:05:55] INFO:  [ViewService] Imported 0 Views.
+[2020-07-08 14:05:55] DEBUG: Executing (default): SELECT `id`, `route`, `method`, `createdAt`, `updatedAt`, `roleId` FROM `route_permission` AS `RoutePermission`;
+[2020-07-08 14:05:55] DEBUG: Executing (default): SELECT `id`, `view`, `permissions`, `createdAt`, `updatedAt`, `roleId` FROM `view_permission` AS `ViewPermission`;
+[2020-07-08 14:05:55] WARN:  [PermissionService] Permission 4722479a-7033-4bb2-adfa-ec901c53e171 applies to non-existing view "UsersView".
+[2020-07-08 14:05:55] WARN:  [PermissionService] Permission 550a233f-7b41-46f0-a383-60e5d1ccc4a7 applies to non-existing view "ViewsView".
+[2020-07-08 14:05:55] INFO:  [PermissionService] Permission cache built, 2 permissions found.
+[2020-07-08 14:05:55] INFO:  Server listening on port: 3333
