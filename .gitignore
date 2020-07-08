@@ -1,0 +1,5 @@
+dist/
+src/config/
+node_modules/
+.idea/
+.env

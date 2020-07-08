@@ -1,0 +1,11 @@
+export declare enum EntityFieldType {
+    STRING = "STRING",
+    UUID = "UUID",
+    EMAIL = "EMAIL",
+    STRING_ARRAY = "STRING_ARRAY",
+    NUMBER = "NUMBER",
+    BOOLEAN = "BOOLEAN",
+    REFERENCE = "REFERENCE",
+    COMPOSITION = "COMPOSITION",
+    COLLECTION = "COLLECTION"
+}

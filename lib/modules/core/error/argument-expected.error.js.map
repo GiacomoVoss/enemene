@@ -1,0 +1,1 @@
+{"version":3,"file":"argument-expected.error.js","sourceRoot":"","sources":["../../../../src/modules/core/error/argument-expected.error.ts"],"names":[],"mappings":";;;AAEA,MAAa,qBAAsB,SAAQ,KAAK;IAK5C,YAAY,OAAe;QACvB,KAAK,CAAC,0BAA0B,GAAG,OAAO,CAAC,CAAC;QAJhD,eAAU,GAAW,GAAG,CAAC;QACzB,SAAI,GAAW,uBAAuB,CAAC;IAIvC,CAAC;CACJ;AARD,sDAQC"}
