@@ -1,9 +1,8 @@
-import {Server} from "@overnightjs/core";
 import {allowHeaders} from "../middleware/allow-headers.middleware";
 import {PermissionService} from "../auth";
 import proxy from "express-http-proxy";
 import {RouterService} from "../router/service/router.service";
-import * as express from "express";
+import express from "express";
 import path from "path";
 import {View, ViewService} from "../view";
 import {EnemeneConfig} from "./interface/enemene-config.interface";
@@ -23,9 +22,11 @@ require("express-async-errors");
 
 export {EnemeneConfig} from "./interface/enemene-config.interface";
 
-export class Enemene extends Server {
+export class Enemene {
 
     public static app: Enemene;
+
+    public server: express.Application;
 
     public db: Sequelize;
 
@@ -34,11 +35,11 @@ export class Enemene extends Server {
     private importDb: boolean;
 
     constructor(public config: EnemeneConfig) {
-        super(process.env.NODE_ENV === "development"); // setting showLogs to true
+        this.server = express();
         this.devMode = process.env.NODE_ENV === "development";
         LogService.createLogger(config.logLevel, config.logPath);
-        this.app.use(allowHeaders);
-        this.app.use(bodyParser.json());
+        this.server.use(allowHeaders);
+        this.server.use(bodyParser.json());
         LogService.log[config.logLevel.toLowerCase()]("Log level: " + config.logLevel.toUpperCase());
 
         this.config.port = `${this.normalizePort(config.port)}`;
@@ -100,17 +101,17 @@ export class Enemene extends Server {
                 });
             });
 
-        if (this.showLogs) {
-            this.app.use("/", proxy("http://localhost:8090", {
+        if (this.devMode) {
+            this.server.use("/", proxy("http://localhost:8090", {
                 filter: (req) => {
                     return !req.path.startsWith("/api");
                 }
             }));
-            RouterService.loadPaths(this.app);
+            RouterService.loadPaths(this.server);
         } else {
-            this.app.use("/", express.static(path.join(__dirname, "..", "frontend", "dist")));
-            RouterService.loadPaths(this.app);
-            this.app.get("/*", (req, res) => {
+            this.server.use("/", express.static(path.join(__dirname, "..", "frontend", "dist")));
+            RouterService.loadPaths(this.server);
+            this.server.get("/*", (req, res) => {
                 res.sendFile(path.join(__dirname, "..", "frontend", "dist", "index.html"));
             });
         }
@@ -121,7 +122,7 @@ export class Enemene extends Server {
     }
 
     public start(): void {
-        this.app.listen(this.config.port, () => {
+        this.server.listen(this.config.port, () => {
             LogService.log.info("Server listening on port: " + this.config.port);
         });
     }
