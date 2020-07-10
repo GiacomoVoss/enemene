@@ -120,4 +120,31 @@ export default class ViewGetRouter {
 
         return ViewService.getModelForView(view);
     }
+
+    @Get("/allowedValues/:view/:id/:attribute")
+    async getAllowedValuesForObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
+                                                                       @Path("view") viewName: string,
+                                                                       @Path("id") objectId: uuid,
+                                                                       @Path("attribute") collectionField: keyof ENTITY,
+                                                                       @Context() context: Dictionary<serializable>): Promise<DataResponse<any>> {
+        PermissionService.checkViewPermission(viewName, RequestMethod.GET, user);
+
+        const baseView: View<ENTITY> = ViewService.getViewNotNull(viewName);
+        const collectionFieldDefinition: ViewFieldDefinition<ENTITY, any> | undefined = baseView.fields
+            .filter(field => typeof field !== "string")
+            .find((field: ViewFieldDefinition<ENTITY, any>) => field.field === collectionField) as ViewFieldDefinition<ENTITY, any>;
+
+        if (!collectionFieldDefinition || collectionFieldDefinition.allowedValuesView) {
+            throw new UnauthorizedError();
+        }
+
+        const view: View<any> = collectionFieldDefinition.view;
+        const fields: string[] = ViewService.getFields(view);
+        const data: DataObject<ENTITY>[] = await DataService.findAll(view.entity(), ViewService.getFindOptions(view, user, context));
+        const model = ViewService.getModelForView(view);
+        return {
+            data: await Promise.all(data.map((object: DataObject<any>) => DataService.filterFields(object, fields))) as Partial<any>[],
+            model,
+        };
+    }
 }

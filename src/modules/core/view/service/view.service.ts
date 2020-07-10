@@ -54,10 +54,7 @@ export class ViewService {
             return null;
         }
 
-        return {
-            ...ViewService.VIEWS[viewName],
-            name: viewName,
-        };
+        return ViewService.VIEWS[viewName];
     }
 
     /**
@@ -119,7 +116,6 @@ export class ViewService {
                 if (viewFieldDefinition.allowedValuesView) {
                     model[view.entity().name][viewFieldDefinition.field] = {
                         ...model[view.entity().name][viewFieldDefinition.field],
-                        allowedValues: viewFieldDefinition.allowedValuesView.name,
                     };
                 }
             }

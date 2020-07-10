@@ -4,12 +4,12 @@ import {Response} from "express-serve-static-core";
 import {ParameterType} from "../enum/parameter-type.enum";
 import * as express from "express";
 import {Application, NextFunction, Request} from "express";
-import {ISecureRequest} from "@overnightjs/jwt";
 import {AbstractUser, Authorization, PermissionService} from "../../auth";
 import {authenticatedGuard} from "../../auth/guard/authenticated.guard";
 import {RequestMethod} from "../enum/request-method.enum";
 import {RuntimeError} from "../../interface/runtime-error.interface";
 import {LogService} from "../../log";
+import {SecureRequest} from "../../auth/interface/secure-request.interface";
 
 export class RouterService {
 
@@ -34,7 +34,7 @@ export class RouterService {
         this.paths[path.method][fullPath] = path;
     }
 
-    private static async handler(req: ISecureRequest, res: Response, next: Function, pathDefinition: PathDefinition): Promise<void> {
+    private static async handler(req: SecureRequest, res: Response, next: Function, pathDefinition: PathDefinition): Promise<void> {
         const pathFunction: Function = pathDefinition.fn;
         const parameterValues: any[] = pathDefinition.parameters.map((param: string[]) => this.resolveParameter(req, res, param));
         res.send(await pathFunction.apply(this, parameterValues));
@@ -55,12 +55,12 @@ export class RouterService {
             paths.sort((entry1: string, entry2: string) => entry2.length - entry1.length);
             paths.forEach((path: string) => {
                 const pathDefinition: PathDefinition = this.paths[method][path];
-                let handlers: express.RequestHandler[] = [(req, res, next) => this.handler(req as ISecureRequest, res, next, pathDefinition)];
+                let handlers: express.RequestHandler[] = [(req, res, next) => this.handler(req as SecureRequest, res, next, pathDefinition)];
                 switch (pathDefinition.authorization) {
                     case Authorization.ROUTE:
                         handlers = [
                             authenticatedGuard,
-                            (req: ISecureRequest, res: Response, next: NextFunction) => {
+                            (req: SecureRequest, res: Response, next: NextFunction) => {
                                 PermissionService.checkRoutePermission(path, pathDefinition, req.payload);
                                 next();
                             },
@@ -94,7 +94,7 @@ export class RouterService {
         LogService.log.info(`[RouterService] Loaded ${count} paths.`);
     }
 
-    private static resolveParameter(req: ISecureRequest, res: Response, param: string[]): any {
+    private static resolveParameter(req: SecureRequest, res: Response, param: string[]): any {
         const [paramType, value] = param;
         let context: Dictionary<string>;
         switch (paramType) {

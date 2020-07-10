@@ -8,11 +8,6 @@ import {Filter} from "../../filter";
 export interface View<ENTITY extends DataObject<ENTITY>> {
 
     /**
-     * Name of the view.
-     */
-    name: string;
-
-    /**
      * Entity the view is based on.
      */
     entity: () => ConstructorOf<ENTITY>;

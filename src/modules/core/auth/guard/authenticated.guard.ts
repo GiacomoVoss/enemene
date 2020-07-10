@@ -1,9 +1,9 @@
 import {NextFunction, Response} from "express";
 import {AuthService} from "../service/auth.service";
-import {ISecureRequest} from "@overnightjs/jwt";
 import {AbstractUser} from "..";
+import {SecureRequest} from "../interface/secure-request.interface";
 
-export const authenticatedGuard = async (req: ISecureRequest, res: Response, next: NextFunction) => {
+export const authenticatedGuard = async (req: SecureRequest, res: Response, next: NextFunction) => {
 
     const token: string = req.header("Authorization");
     if (!token) {
