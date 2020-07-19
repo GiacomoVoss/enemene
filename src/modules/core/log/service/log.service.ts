@@ -3,6 +3,7 @@ import {Logger} from "winston";
 import {ConsoleTransportInstance, StreamTransportInstance} from "winston/lib/winston/transports";
 import {FileService} from "../../file/service/file.service";
 import {LogLevel} from "../enum/log-level.enum";
+import chalk from "chalk";
 
 require("winston-daily-rotate-file");
 
@@ -16,7 +17,17 @@ export class LogService {
         }),
         winston.format.printf(({level, message, label, timestamp}) => {
             const levelPadded = (level.toUpperCase() + ":         ").substr(0, 6);
-            return `[${timestamp}${label ? ": " + label : ""}] ${levelPadded} ${message}`;
+            const text: string = `[${timestamp}${label ? ": " + label : ""}] ${levelPadded} ${message}`;
+            switch (level.toLowerCase()) {
+                case LogLevel.WARN:
+                    return chalk.yellow(text);
+                case LogLevel.ERROR:
+                    return chalk.red(text);
+                case LogLevel.INFO:
+                    return chalk.green(text);
+                default:
+                    return chalk.grey(text);
+            }
         })
     );
 
