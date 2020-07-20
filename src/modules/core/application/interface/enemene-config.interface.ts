@@ -18,4 +18,6 @@ export interface EnemeneConfig {
     }
 
     userModel: typeof AbstractUser;
+
+    proxyFor?: string;
 }

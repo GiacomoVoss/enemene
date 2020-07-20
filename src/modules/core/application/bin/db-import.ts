@@ -8,20 +8,18 @@ const YAML = require("yaml");
 
 export class DbImport {
 
-    constructor(private db: Sequelize) {
+    constructor(private db: Sequelize,
+                private fixturesPath: string) {
     }
 
     public async resetAndImportDb() {
         LogService.log.level = LogLevel.INFO;
         const database: string = this.db.config.database;
         return this.db.transaction(async t => {
-            LogService.log.info("Deleting database");
-            LogService.log.info("Creating new database");
-            await this.db.dropSchema(database, {
+            LogService.log.info("Clearing database");
+            await this.db.dropAllSchemas({
                 logging: sql => LogService.log.info(`[DbImport] ${sql}`),
             });
-            await this.db.query(`CREATE DATABASE ${database} CHARACTER SET = utf8 COLLATE = utf8_general_ci`);
-            await this.db.query(`USE ${database}`);
             await this.db.sync({
                 logging: (sql: string) => LogService.log.info(`[DbImport] ${sql}`),
                 force: true,
@@ -33,9 +31,9 @@ export class DbImport {
 
     private async importData(transaction) {
         try {
-            const files: string[] = fs.readdirSync("./fixtures");
+            const files: string[] = fs.readdirSync(this.fixturesPath);
             for (const i in files) {
-                await this.importFile(path.join("./fixtures", files[i]), transaction);
+                await this.importFile(path.join(this.fixturesPath, files[i]), transaction);
             }
         } catch (err) {
             LogService.log.error(err);

@@ -32,8 +32,6 @@ export class Enemene {
 
     public devMode: boolean;
 
-    private importDb: boolean;
-
     constructor(public config: EnemeneConfig) {
         this.server = express();
         this.devMode = process.env.NODE_ENV === "development";
@@ -43,7 +41,6 @@ export class Enemene {
         LogService.log[config.logLevel.toLowerCase()]("Log level: " + config.logLevel.toUpperCase());
 
         this.config.port = `${this.normalizePort(config.port)}`;
-        this.importDb = process.argv[2] === "import";
 
         this.db = new Sequelize({
             host: config.db.host,
@@ -71,12 +68,15 @@ export class Enemene {
     public static async create(config: EnemeneConfig): Promise<Enemene> {
         Enemene.app = new Enemene(config);
         await Enemene.app.db.authenticate();
-        if (Enemene.app.importDb) {
-            // Just import DB and teminate.
-            await new DbImport(Enemene.app.db).resetAndImportDb();
-            process.exit(0);
-        }
         return Enemene.app;
+    }
+
+    /**
+     * Import database from fixtures and terminate.
+     */
+    public async importDatabase(fixturesPath: string): Promise<void> {
+        await new DbImport(this.db, fixturesPath).resetAndImportDb();
+        process.exit(0);
     }
 
     public async setup(routers: Dictionary<Function>, views: Dictionary<View<any>>): Promise<void> {
@@ -101,8 +101,8 @@ export class Enemene {
                 });
             });
 
-        if (this.devMode) {
-            this.server.use("/", proxy("http://localhost:8090", {
+        if (this.config.proxyFor) {
+            this.server.use("/", proxy(this.config.proxyFor, {
                 filter: (req) => {
                     return !req.path.startsWith("/api");
                 }
