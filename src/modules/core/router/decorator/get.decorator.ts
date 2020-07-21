@@ -1,9 +1,8 @@
 import {RequestMethod} from "../enum/request-method.enum";
 import {Route} from "./route.decorator";
-import {Authorization} from "../../auth/enum/authorization.enum";
 
-export function Get(path: string, authorization: Authorization = Authorization.ROUTE): Function {
+export function Get(path: string, isPublic: boolean = false): Function {
     return function (target: any, key: string, descriptor: PropertyDescriptor): void {
-        Route(path, authorization, RequestMethod.GET)(target, key, descriptor);
+        Route(path, isPublic, RequestMethod.GET)(target, key, descriptor);
     };
 }

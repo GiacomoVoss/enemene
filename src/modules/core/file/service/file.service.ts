@@ -1,6 +1,5 @@
 import * as fs from "fs";
 import * as path from "path";
-import {LogService} from "../../log/service/log.service";
 
 export class FileService {
 
@@ -44,32 +43,6 @@ export class FileService {
      */
     public static fileExists(filePath: string): boolean {
         return fs.existsSync(filePath);
-    }
-
-    /**
-     * Recursively creates a folder and all the folders along the way, if it doesn't exist.
-     *
-     * @param dir   Path to the folder.
-     */
-    public static mkdirIfMissing(dir: string) {
-        const folders = dir.split(path.sep);
-
-        folders.reduce((prev: string, act: string) => {
-            const _path = path.join(prev, act);
-
-            if (act == "." || act == "..") {
-                return _path;
-            }
-
-            if (!fs.existsSync(_path)) {
-                if (LogService.log) {
-                    LogService.log.info("Creating missing folder: " + _path);
-                }
-                fs.mkdirSync(_path);
-            }
-
-            return _path;
-        }, dir.substr(0, 1) === path.sep ? path.sep : "");
     }
 
     /**

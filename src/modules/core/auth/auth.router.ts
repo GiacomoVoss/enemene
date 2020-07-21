@@ -2,13 +2,12 @@ import {UnauthorizedError} from "./error/unauthorized.error";
 import * as bcrypt from "bcrypt";
 import {AuthService} from "./service/auth.service";
 import {Body, Get, Post, RouterModule} from "../router";
-import {Authorization} from "./enum/authorization.enum";
 import {AbstractUser, Enemene} from "../../..";
 
 @RouterModule("auth")
 export default class AuthRouter {
 
-    @Post("login", Authorization.PUBLIC)
+    @Post("login", true)
     async login(@Body("username") username: string,
                 @Body("password") password: string): Promise<string> {
         if (!username || !password) {
@@ -38,7 +37,7 @@ export default class AuthRouter {
         return AuthService.sign(payload);
     }
 
-    @Get("public-key", Authorization.PUBLIC)
+    @Get("public-key", true)
     async getPublicKey(): Promise<string> {
         return AuthService.PUBLIC_KEY;
     }

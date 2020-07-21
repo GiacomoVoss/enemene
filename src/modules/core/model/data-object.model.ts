@@ -7,7 +7,9 @@ import {Dictionary} from "../../../base/type/dictionary.type";
 /**
  * Basic abstract entity model.
  */
-@Table
+@Table({
+    tableName: "_ignore",
+})
 export class DataObject<E> extends Model<DataObject<E>> {
 
     $entity = this.constructor.name;

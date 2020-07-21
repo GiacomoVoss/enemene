@@ -7,7 +7,7 @@ import {UnauthorizedError} from "../error/unauthorized.error";
 import {RequestMethod} from "../../router/enum/request-method.enum";
 import {Permission} from "../enum/permission.enum";
 import {ViewService} from "../../view/service/view.service";
-import {LogService} from "../../log";
+import {Enemene} from "../../../..";
 
 export class PermissionService {
 
@@ -48,11 +48,18 @@ export class PermissionService {
                         method: RequestMethod.GET,
                     }),
                 ],
+                "/action/:action": [
+                    new RoutePermission({
+                        id: "43173460-84e7-433c-836a-67251db83c91",
+                        route: "/action/:action",
+                        method: RequestMethod.GET,
+                    }),
+                ],
             },
             view: {},
         };
 
-        LogService.log.info(`[PermissionService] Permission cache built, ${viewPermissions.length + routePermissions.length} permissions found.`);
+        Enemene.log.info(this.name, `Permission cache built, ${viewPermissions.length + routePermissions.length} permissions found.`);
     }
 
     public static checkRoutePermission(fullPath: string, pathDefinition: PathDefinition, user: AbstractUser): void {
@@ -108,7 +115,7 @@ export class PermissionService {
         if ((permission as RoutePermission).route) {
             const routePermission = permission as RoutePermission;
             if (!RouterService.hasRoute(routePermission.method, routePermission.route)) {
-                LogService.log.warn(`[PermissionService] Permission ${routePermission.id} applies to non-existing route "${routePermission.method} ${routePermission.route}".`);
+                Enemene.log.warn(this.name, `Permission ${routePermission.id} applies to non-existing route "${routePermission.method} ${routePermission.route}".`);
             }
             if (!PermissionService.permissionCache[routePermission.roleId].route[routePermission.route]) {
                 PermissionService.permissionCache[routePermission.roleId].route[routePermission.route] = [];
@@ -117,7 +124,7 @@ export class PermissionService {
         } else if ((permission as ViewPermission).view) {
             const viewPermission = permission as ViewPermission;
             if (!ViewService.getView(viewPermission.view)) {
-                LogService.log.warn(`[PermissionService] Permission ${viewPermission.id} applies to non-existing view "${viewPermission.view}".`);
+                Enemene.log.warn(this.name, `Permission ${viewPermission.id} applies to non-existing view "${viewPermission.view}".`);
             }
             PermissionService.permissionCache[viewPermission.roleId].view[viewPermission.view] = viewPermission;
         }

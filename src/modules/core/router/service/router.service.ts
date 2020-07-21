@@ -4,12 +4,13 @@ import {Response} from "express-serve-static-core";
 import {ParameterType} from "../enum/parameter-type.enum";
 import * as express from "express";
 import {Application, NextFunction, Request} from "express";
-import {AbstractUser, Authorization, PermissionService} from "../../auth";
+import {AbstractUser} from "../../auth";
 import {authenticatedGuard} from "../../auth/guard/authenticated.guard";
 import {RequestMethod} from "../enum/request-method.enum";
 import {RuntimeError} from "../../interface/runtime-error.interface";
-import {LogService} from "../../log";
 import {SecureRequest} from "../../auth/interface/secure-request.interface";
+import {PermissionService} from "../../auth/service/permission.service";
+import {Enemene} from "../../../..";
 
 export class RouterService {
 
@@ -56,42 +57,35 @@ export class RouterService {
             paths.forEach((path: string) => {
                 const pathDefinition: PathDefinition = this.paths[method][path];
                 let handlers: express.RequestHandler[] = [(req, res, next) => this.handler(req as SecureRequest, res, next, pathDefinition)];
-                switch (pathDefinition.authorization) {
-                    case Authorization.ROUTE:
-                        handlers = [
-                            authenticatedGuard,
-                            (req: SecureRequest, res: Response, next: NextFunction) => {
-                                PermissionService.checkRoutePermission(path, pathDefinition, req.payload);
-                                next();
-                            },
-                            ...handlers,
-                        ];
-                        break;
-                    case Authorization.PUBLIC:
-                        break;
+                if (!pathDefinition.isPublic) {
+                    handlers = [
+                        authenticatedGuard,
+                        (req: SecureRequest, res: Response, next: NextFunction) => {
+                            PermissionService.checkRoutePermission(path, pathDefinition, req.payload);
+                            next();
+                        },
+                        ...handlers,
+                    ];
                 }
                 switch (pathDefinition.method) {
                     case RequestMethod.GET:
                         app.get(`/api${path}`, ...handlers, this.logError);
-                        LogService.log.debug(`[RouterService] Registering GET     /api${path}`);
                         break;
                     case RequestMethod.POST:
                         app.post(`/api${path}`, ...handlers, this.logError);
-                        LogService.log.debug(`[RouterService] Registering POST    /api${path}`);
                         break;
                     case RequestMethod.PUT:
                         app.put(`/api${path}`, ...handlers, this.logError);
-                        LogService.log.debug(`[RouterService] Registering PUT     /api${path}`);
                         break;
                     case RequestMethod.DELETE:
                         app.delete(`/api${path}`, ...handlers, this.logError);
-                        LogService.log.debug(`[RouterService] Registering DELETE  /api${path}`);
                         break;
                 }
+                Enemene.log.debug(this.name, `Registering ${pathDefinition.method.padEnd(7)} /api${path}` + (pathDefinition.isPublic ? " (PUBLIC)" : ""));
                 count++;
             });
         });
-        LogService.log.info(`[RouterService] Loaded ${count} paths.`);
+        Enemene.log.info(this.name, `Registered ${count} paths.`);
     }
 
     private static resolveParameter(req: SecureRequest, res: Response, param: string[]): any {
@@ -135,9 +129,9 @@ export class RouterService {
         const statusCode = err.statusCode || 500;
 
         if ([400, 401, 403, 404].includes(statusCode)) {
-            LogService.log.info(err.message);
+            Enemene.log.info("Access", err.message);
         } else {
-            LogService.log.error(err);
+            Enemene.log.error("Access", err);
         }
 
         return res.status(statusCode).send({

@@ -2,7 +2,7 @@ import {Body, Context, CurrentUser, Path, Post, RouterModule} from "../router";
 import {ViewService} from "./service/view.service";
 import {DataResponse, DataService} from "../data";
 import {DataObject} from "../model";
-import {AbstractUser, PermissionService} from "../auth";
+import {AbstractUser} from "../auth";
 import {RequestMethod} from "../router/enum/request-method.enum";
 import {View, ViewFieldDefinition} from "./";
 import {UnauthorizedError} from "../auth/error/unauthorized.error";
@@ -14,6 +14,7 @@ import {serializable} from "../../../base/type/serializable.type";
 import {ModelService} from "../model/service/model.service";
 import {CollectionField} from "../model/interface/collection-field.class";
 import {CompositionField} from "../model/interface/composition-field.class";
+import {PermissionService} from "../auth/service/permission.service";
 
 @RouterModule("view")
 export default class ViewPostRouter {
@@ -61,10 +62,6 @@ export default class ViewPostRouter {
             .map((field: string) => field.substr(field.indexOf(".") + 1));
         const filteredData: Dictionary<serializable> = pick(data, subFields);
         const fieldModel = baseModel[collectionField];
-
-        console.log(subFields);
-        console.log(filteredData);
-        console.log(fieldModel);
 
         let object: DataObject<ENTITY>;
         if (fieldModel instanceof CollectionField) {

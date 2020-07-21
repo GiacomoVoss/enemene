@@ -56,12 +56,12 @@ export class FilterService {
                 if (!context[key]) {
                     throw new ContextParameterMissingError(key);
                 }
-                result = result.replace(match, value);
+                result = result.replace(match, context[key]);
             });
         }
 
-        if (!isNaN(parseInt(result))) {
-            return +result;
+        if (result.match(/\d+(\.\d+)?/)) {
+            return parseFloat(result);
         }
 
         return result;

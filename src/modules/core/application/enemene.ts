@@ -1,5 +1,4 @@
 import {allowHeaders} from "../middleware/allow-headers.middleware";
-import {PermissionService} from "../auth";
 import proxy from "express-http-proxy";
 import {RouterService} from "../router/service/router.service";
 import express from "express";
@@ -7,7 +6,6 @@ import path from "path";
 import {View, ViewService} from "../view";
 import {EnemeneConfig} from "./interface/enemene-config.interface";
 import {Sequelize} from "sequelize-typescript";
-import {LogService} from "../log";
 import {DbImport} from "./bin/db-import";
 import ViewGetRouter from "../view/view-get.router";
 import ViewPostRouter from "../view/view-post.router";
@@ -16,6 +14,12 @@ import AuthRouter from "../auth/auth.router";
 import {ModelRouter} from "../model/model.router";
 import {Dictionary} from "../../../base/type/dictionary.type";
 import {PathDefinition} from "../auth/interface/path-definition.interface";
+import {PermissionService} from "../auth/service/permission.service";
+import chalk from "chalk";
+import {LogService} from "../log/service/log.service";
+import {AbstractAction} from "../action/class/abstract-action.class";
+import {ActionService} from "../action/service/action.service";
+import ActionRouter from "../action/action.router";
 import bodyParser = require("body-parser");
 
 require("express-async-errors");
@@ -26,6 +30,8 @@ export class Enemene {
 
     public static app: Enemene;
 
+    public static log: LogService;
+
     public server: express.Application;
 
     public db: Sequelize;
@@ -35,10 +41,9 @@ export class Enemene {
     constructor(public config: EnemeneConfig) {
         this.server = express();
         this.devMode = process.env.NODE_ENV === "development";
-        LogService.createLogger(config.logLevel, config.logPath);
         this.server.use(allowHeaders);
         this.server.use(bodyParser.json());
-        LogService.log[config.logLevel.toLowerCase()]("Log level: " + config.logLevel.toUpperCase());
+        Enemene.log[config.logLevel.toLowerCase()]("Server", "Log level: " + config.logLevel.toUpperCase());
 
         this.config.port = `${this.normalizePort(config.port)}`;
 
@@ -59,13 +64,15 @@ export class Enemene {
                 const camel: string = kebab.map((chunk: string) =>
                     chunk.substr(0, 1).toUpperCase() + chunk.substr(1).toLowerCase()
                 ).join("");
+                Enemene.log.debug("Database", `Registering model ${chalk.bold(camel)}.`);
                 return camel === member;
             },
-            logging: sql => LogService.log.debug(sql),
+            logging: sql => Enemene.log.debug("Database", sql),
         });
     }
 
     public static async create(config: EnemeneConfig): Promise<Enemene> {
+        Enemene.log = new LogService(config.logLevel, config.logPath);
         Enemene.app = new Enemene(config);
         await Enemene.app.db.authenticate();
         return Enemene.app;
@@ -79,16 +86,18 @@ export class Enemene {
         process.exit(0);
     }
 
-    public async setup(routers: Dictionary<Function>, views: Dictionary<View<any>>): Promise<void> {
+    public async setup(routers: Dictionary<Function>, views: Dictionary<View<any>>, actions: Dictionary<typeof AbstractAction>): Promise<void> {
         await this.setupRouters({
             ...routers,
             AuthRouter,
+            ActionRouter,
             ViewGetRouter,
             ViewPostRouter,
             ViewDeleteRouter,
             ModelRouter,
         });
         await this.setupViews(views);
+        await this.setupActions(actions);
         await PermissionService.buildCache();
     }
 
@@ -107,6 +116,7 @@ export class Enemene {
                     return !req.path.startsWith("/api");
                 }
             }));
+            Enemene.log.info("Server", `Proxying "${this.config.proxyFor}".`);
             RouterService.loadPaths(this.server);
         } else {
             this.server.use("/", express.static(path.join(__dirname, "..", "frontend", "dist")));
@@ -121,9 +131,13 @@ export class Enemene {
         await ViewService.init(views);
     }
 
+    private async setupActions(actions: Dictionary<typeof AbstractAction>): Promise<void> {
+        await ActionService.init(actions);
+    }
+
     public start(): void {
         this.server.listen(this.config.port, () => {
-            LogService.log.info("Server listening on port: " + this.config.port);
+            Enemene.log.info("Server", "Listening on port: " + this.config.port);
         });
     }
 

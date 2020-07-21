@@ -1,8 +1,7 @@
 import {PathDefinition} from "../../auth/interface/path-definition.interface";
 import {RequestMethod} from "../enum/request-method.enum";
-import {Authorization} from "../../auth/enum/authorization.enum";
 
-export function Route(path: string, authorization: Authorization = Authorization.ROUTE, requestMethod: RequestMethod): Function {
+export function Route(path: string, isPublic: boolean, requestMethod: RequestMethod): Function {
     return function (target: any, key: string, descriptor: PropertyDescriptor): void {
         const paths: PathDefinition[] = target.constructor.prototype.$paths || [];
         const parameters = target.constructor.prototype.$parameters || {};
@@ -12,7 +11,7 @@ export function Route(path: string, authorization: Authorization = Authorization
             path,
             fn: descriptor.value,
             parameters: parameters[key] ?? [],
-            authorization,
+            isPublic,
         });
 
         target.constructor.prototype.$paths = paths;

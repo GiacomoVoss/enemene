@@ -12,3 +12,4 @@ export class AbstractUser extends DataObject<AbstractUser> {
 
     roleId: uuid;
 }
+

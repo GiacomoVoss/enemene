@@ -1,5 +1,5 @@
 import {Context, CurrentUser, Get, Path, Query, RouterModule} from "../router";
-import {AbstractUser, Authorization, PermissionService} from "../auth";
+import {AbstractUser} from "../auth";
 import {ViewService} from "./service/view.service";
 import {DataResponse, DataService} from "../data";
 import {DataObject} from "../model";
@@ -11,11 +11,12 @@ import {Dictionary} from "../../../base/type/dictionary.type";
 import {EntityField} from "../model/interface/entity-field.class";
 import {uuid} from "../../../base/type/uuid.type";
 import {serializable} from "../../../base/type/serializable.type";
+import {PermissionService} from "../auth/service/permission.service";
 
 @RouterModule("view")
 export default class ViewGetRouter {
 
-    @Get("/:view", Authorization.ROUTE)
+    @Get("/:view")
     async getObjects<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
                                                         @Path("view") viewName: string,
                                                         @Query("order") orderString: string,
@@ -34,7 +35,7 @@ export default class ViewGetRouter {
         };
     }
 
-    @Get("/:view/:id", Authorization.ROUTE)
+    @Get("/:view/:id")
     async getObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
                                                        @Path("view") viewName: string,
                                                        @Path("id") objectId: string,
@@ -51,7 +52,7 @@ export default class ViewGetRouter {
         };
     }
 
-    @Get("/:view/:id/:attribute", Authorization.ROUTE)
+    @Get("/:view/:id/:attribute")
     async getCollection<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
                                                            @Path("view") viewName: string,
                                                            @Path("id") objectId: string,
@@ -77,7 +78,7 @@ export default class ViewGetRouter {
         };
     }
 
-    @Get("/:view/:id/:attribute/:subId", Authorization.ROUTE)
+    @Get("/:view/:id/:attribute/:subId")
     async getCollectionObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
                                                                  @Path("view") viewName: string,
                                                                  @Path("id") objectId: uuid,
@@ -112,7 +113,7 @@ export default class ViewGetRouter {
         };
     }
 
-    @Get("/model/:view", Authorization.ROUTE)
+    @Get("/model/:view")
     async getViewModel(@CurrentUser user: AbstractUser,
                        @Path("view") viewName: string): Promise<Dictionary<Dictionary<EntityField> | string>> {
         PermissionService.checkViewPermission(viewName, RequestMethod.GET, user);

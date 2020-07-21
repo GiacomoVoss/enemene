@@ -1,8 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import {Sequelize} from "sequelize-typescript";
-import {LogLevel} from "../../log/enum/log-level.enum";
-import {LogService} from "../../log/service/log.service";
+import {Enemene} from "../enemene";
 
 const YAML = require("yaml");
 
@@ -13,19 +12,20 @@ export class DbImport {
     }
 
     public async resetAndImportDb() {
-        LogService.log.level = LogLevel.INFO;
         const database: string = this.db.config.database;
         return this.db.transaction(async t => {
-            LogService.log.info("Clearing database");
-            await this.db.dropAllSchemas({
-                logging: sql => LogService.log.info(`[DbImport] ${sql}`),
-            });
+            Enemene.log.info(this.constructor.name, "Clearing database");
+            await this.db.query(`DROP DATABASE IF EXISTS ${database}`);
+            await this.db.query(`CREATE DATABASE ${database} CHARACTER SET = utf8 COLLATE = utf8_general_ci`);
+            await this.db.query(`USE ${database}`);
             await this.db.sync({
-                logging: (sql: string) => LogService.log.info(`[DbImport] ${sql}`),
-                force: true,
+                logging: (sql: string) => Enemene.log.debug(this.constructor.name, sql),
+            });
+            await this.db.dropSchema("_ignore", {
+                logging: (sql: string) => Enemene.log.debug(this.constructor.name, sql),
             });
             await this.importData(t);
-            LogService.log.info("[DbImport] Import completed.");
+            Enemene.log.info(this.constructor.name, "Import completed.");
         });
     }
 
@@ -36,7 +36,7 @@ export class DbImport {
                 await this.importFile(path.join(this.fixturesPath, files[i]), transaction);
             }
         } catch (err) {
-            LogService.log.error(err);
+            Enemene.log.error(this.constructor.name, err);
         }
     }
 
@@ -56,7 +56,7 @@ export class DbImport {
         const promises = [];
         Object.keys(creates).forEach(model => {
             promises.push(this.db.model(model).bulkCreate(creates[model], {transaction: transaction}));
-            LogService.log.info(`[DbImport] Creating ${creates[model].length} objects for ${model}`);
+            Enemene.log.info(this.constructor.name, `Creating ${creates[model].length} objects for ${model}`);
         });
 
         await Promise.all(promises);

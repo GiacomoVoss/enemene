@@ -2,13 +2,14 @@ import {Context, CurrentUser, Delete, Path, Post, RouterModule} from "../router"
 import {ViewService} from "./service/view.service";
 import {DataService} from "../data";
 import {DataObject} from "../model";
-import {AbstractUser, PermissionService} from "../auth";
+import {AbstractUser} from "../auth";
 import {RequestMethod} from "../router/enum/request-method.enum";
 import {View, ViewFieldDefinition} from "./";
 import {UnauthorizedError} from "../auth/error/unauthorized.error";
 import {uuid} from "../../../base/type/uuid.type";
 import {Dictionary} from "../../../base/type/dictionary.type";
 import {serializable} from "../../../base/type/serializable.type";
+import {PermissionService} from "../auth/service/permission.service";
 
 @RouterModule("view")
 export default class ViewDeleteRouter {

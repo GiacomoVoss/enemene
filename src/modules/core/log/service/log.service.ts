@@ -1,23 +1,50 @@
 import * as winston from "winston";
 import {Logger} from "winston";
 import {ConsoleTransportInstance, StreamTransportInstance} from "winston/lib/winston/transports";
-import {FileService} from "../../file/service/file.service";
 import {LogLevel} from "../enum/log-level.enum";
 import chalk from "chalk";
+import mkdirp from "mkdirp";
 
 require("winston-daily-rotate-file");
 
 export class LogService {
 
-    public static log: Logger;
+    public log: Logger;
 
-    public static logFormat = winston.format.combine(
+    constructor(logLevel: LogLevel, logsPath: string) {
+        mkdirp.sync(logsPath);
+        this.log = winston.createLogger({
+            level: logLevel.toLowerCase(),
+            transports: LogService.logTransports(logsPath),
+            format: LogService.logFormat
+        });
+    }
+
+    public debug(component: string, message: any): void {
+        this.logInternal(this.log.debug, component, message);
+    }
+
+    public info(component: string, message: any): void {
+        this.logInternal(this.log.info, component, message);
+    }
+
+    public warn(component: string, message: any): void {
+        this.logInternal(this.log.warn, component, message);
+    }
+
+    public error(component: string, message: any): void {
+        this.logInternal(this.log.error, component, message);
+    }
+
+    private static padRight: number = 25;
+
+    private static logFormat = winston.format.combine(
         winston.format.timestamp({
             format: "YYYY-MM-DD HH:mm:ss"
         }),
         winston.format.printf(({level, message, label, timestamp}) => {
-            const levelPadded = (level.toUpperCase() + ":         ").substr(0, 6);
-            const text: string = `[${timestamp}${label ? ": " + label : ""}] ${levelPadded} ${message}`;
+            const levelPadded = level.toUpperCase().padEnd(6);
+            const text: string = `${timestamp}${label ? ": " + label : ""} ${levelPadded}| ${message}`;
             switch (level.toLowerCase()) {
                 case LogLevel.WARN:
                     return chalk.yellow(text);
@@ -31,7 +58,7 @@ export class LogService {
         })
     );
 
-    public static logTransports(path: string): (ConsoleTransportInstance | StreamTransportInstance)[] {
+    private static logTransports(path: string): (ConsoleTransportInstance | StreamTransportInstance)[] {
         return [
             new winston.transports.Console(),
             new ((<any>winston.transports).DailyRotateFile)({
@@ -42,13 +69,7 @@ export class LogService {
         ];
     }
 
-    public static createLogger(logLevel: LogLevel, path: string) {
-        FileService.mkdirIfMissing(path);
-        this.log = winston.createLogger({
-            level: logLevel.toLowerCase(),
-            transports: this.logTransports(path),
-            format: this.logFormat
-        });
+    private logInternal(method: Function, component: string, message: string): void {
+        method(`[${component}]`.padEnd(LogService.padRight) + message);
     }
-
 }

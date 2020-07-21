@@ -9,7 +9,8 @@ import {CollectionField} from "../../model/interface/collection-field.class";
 import {ManyToManyField} from "../../model/interface/many-to-many-field.class";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {AbstractUser} from "../../auth";
-import {LogService} from "../../log/service/log.service";
+import chalk from "chalk";
+import {Enemene} from "../../../..";
 
 /**
  * Service for handling views for data manipulation.
@@ -26,10 +27,10 @@ export class ViewService {
     public static async init(views: Dictionary<View<any>>) {
         const length: number = Object.entries(views).map(([viewName, view]) => {
             ViewService.addView(viewName, view);
-            LogService.log.debug("[ViewService] Imported " + viewName);
+            Enemene.log.debug(this.name, `Registering ${chalk.bold(viewName)}`);
             return view;
         }).length;
-        LogService.log.info(`[ViewService] Imported ${length} Views.`);
+        Enemene.log.info(this.name, `Registered ${chalk.bold(length)} Views.`);
     }
 
     /**
