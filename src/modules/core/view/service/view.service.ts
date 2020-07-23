@@ -11,6 +11,7 @@ import {Dictionary} from "../../../../base/type/dictionary.type";
 import {AbstractUser} from "../../auth";
 import chalk from "chalk";
 import {Enemene} from "../../../..";
+import {ActionConfiguration} from "../../action/interface/action-configuration.interface";
 
 /**
  * Service for handling views for data manipulation.
@@ -30,7 +31,7 @@ export class ViewService {
             Enemene.log.debug(this.name, `Registering ${chalk.bold(viewName)}`);
             return view;
         }).length;
-        Enemene.log.info(this.name, `Registered ${chalk.bold(length)} Views.`);
+        Enemene.log.info(this.name, `Registered ${chalk.bold(length)} views.`);
     }
 
     /**
@@ -55,7 +56,14 @@ export class ViewService {
             return null;
         }
 
-        return ViewService.VIEWS[viewName];
+        return {
+            actions: [],
+            ...ViewService.VIEWS[viewName],
+        };
+    }
+
+    public static getViewActions(view: View<any>): ActionConfiguration[] {
+        return (view.actions ?? []).map(actionClass => actionClass.getConfiguration());
     }
 
     /**

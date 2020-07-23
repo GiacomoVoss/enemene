@@ -4,6 +4,8 @@ import {DataObject} from "../../model";
 
 export class AbstractUser extends DataObject<AbstractUser> {
 
+    $includeInToken: string[];
+
     username: string;
 
     password: string;

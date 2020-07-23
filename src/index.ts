@@ -1,4 +1,4 @@
-// export * from "./modules/core/action";
+export * from "./modules/core/action";
 export * from "./modules/core/application/enemene";
 export * from "./modules/core/log";
 export * from "./modules/core/view";

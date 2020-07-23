@@ -4,6 +4,7 @@ import {ViewFieldDefinition} from "./view-field-definition.interface";
 import {DataObject} from "../../model";
 import {ConstructorOf} from "../../../../base/constructor-of";
 import {Filter} from "../../filter";
+import {AbstractAction} from "../../action";
 
 export interface View<ENTITY extends DataObject<ENTITY>> {
 
@@ -31,4 +32,6 @@ export interface View<ENTITY extends DataObject<ENTITY>> {
      * Default order.
      */
     defaultOrder?: Order;
+
+    actions?: (typeof AbstractAction)[];
 }

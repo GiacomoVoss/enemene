@@ -1,9 +1,12 @@
-import {ActionParameterType} from "../enum/parameter-type.enum";
+import {Dictionary} from "../../../../base/type/dictionary.type";
+import {ActionParameterConfiguration} from "./action-parameter-configuration.interface";
 
 export interface ActionConfiguration {
     name: string;
 
-    parameters: {
-        type: ActionParameterType;
-    }[];
+    label: string;
+
+    parameters: ActionParameterConfiguration[];
+
+    meta?: Dictionary<any>;
 }

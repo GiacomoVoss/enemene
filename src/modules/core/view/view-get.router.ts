@@ -32,6 +32,7 @@ export default class ViewGetRouter {
         return {
             data: await Promise.all(data.map((object: DataObject<ENTITY>) => DataService.filterFields(object, fields))) as Partial<ENTITY>[],
             model,
+            actions: ViewService.getViewActions(view),
         };
     }
 
@@ -49,6 +50,7 @@ export default class ViewGetRouter {
         return {
             data: await DataService.filterFields(data, fields) as Partial<ENTITY>,
             model,
+            actions: ViewService.getViewActions(view),
         };
     }
 

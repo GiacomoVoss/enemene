@@ -3,6 +3,9 @@ import {Dictionary} from "../../../../base/type/dictionary.type";
 import chalk from "chalk";
 import {Enemene} from "../../../..";
 import {AbstractAction} from "../class/abstract-action.class";
+import {ActionParameterType} from "../enum/parameter-type.enum";
+import {ParameterType} from "../../router/enum/parameter-type.enum";
+import {ActionParameterConfiguration} from "../interface/action-parameter-configuration.interface";
 
 /**
  * Service for handling views for data manipulation.
@@ -22,7 +25,7 @@ export class ActionService {
             Enemene.log.debug(this.name, `Registering ${chalk.bold(actionName)}`);
             return actionClass;
         }).length;
-        Enemene.log.info(this.name, `Registered ${chalk.bold(length)} Views.`);
+        Enemene.log.info(this.name, `Registered ${chalk.bold(length)} actions.`);
     }
 
     /**
@@ -62,5 +65,21 @@ export class ActionService {
             throw new ObjectNotFoundError(actionName);
         }
         return action as T;
+    }
+
+    /**
+     * Returns if the given parameter is required to be provided by the client.
+     * @param parameter {ActionParameterConfiguration} The parameter to check.
+     */
+    public static isRequiredParameter(parameter: ActionParameterConfiguration): boolean {
+        return [
+                ActionParameterType.INPUT,
+                ActionParameterType.SELECTION
+            ].includes(parameter.type as ActionParameterType) ||
+            [
+                ParameterType.CONTEXT,
+                ParameterType.QUERY,
+                ParameterType.PATH,
+            ].includes(parameter.type as ParameterType);
     }
 }
