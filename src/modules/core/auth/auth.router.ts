@@ -34,8 +34,6 @@ export default class AuthRouter {
             roleId: user.roleId,
         };
 
-        console.log(user.$includeInToken);
-
         for (const additionalField of user.$includeInToken) {
             payload[additionalField] = user[additionalField];
         }

@@ -191,7 +191,7 @@ export class DataService {
                     .filter((f: string) => f.startsWith(`${key}.`))
                     .map((f: string) => f.substr(f.indexOf(".") + 1));
                 if (!requestedSubFields.length) {
-                    requestedSubFields = ModelService.getDisplayPatternFields(field.classGetter().name).map(field => field.name);
+                    requestedSubFields = ModelService.getDisplayPatternFields(field.classGetter().name).map(f => f.name);
                 }
 
                 if (!value && [EntityFieldType.REFERENCE, EntityFieldType.COLLECTION].includes(field.type)) {
@@ -201,9 +201,11 @@ export class DataService {
                 if (!value) {
                     result[key] = null;
                 } else if (field instanceof ManyToManyField || field instanceof CollectionField) {
-                    result[key] = await Promise.all((value as any[]).map((v => this.filterFields(v, requestedSubFields))));
                     if (requestedSubFields.includes("$count")) {
                         result[`${key}.$count`] = value.length;
+                    }
+                    if (requestedSubFields !== ["$count"]) {
+                        result[key] = await Promise.all((value as any[]).map((v => this.filterFields(v, requestedSubFields))));
                     }
                 } else if (field instanceof CompositionField || field instanceof ReferenceField) {
                     result[key] = await this.filterFields(value as DataObject<any>, requestedSubFields);

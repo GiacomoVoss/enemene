@@ -25,22 +25,18 @@ export async function askForField(entityName: string): Promise<FieldDefinition |
         choices: Object.values(FieldType),
     });
 
-    let dataType: string;
+    let dataType: EntityFieldType;
     let entityPath: string;
     let foreignKey: string;
     let throughType: string;
     let throughPath: string;
+    let required: boolean = false;
 
     if (fieldType === FieldType.Field) {
         dataType = await ask({
             type: "list",
             message: "Enter field data type",
-            choices: [
-                "string",
-                "number",
-                "boolean",
-                "Date",
-            ],
+            choices: Object.values(EntityFieldType),
         });
     } else {
         const entities: Dictionary<string> = await getModels();
@@ -68,6 +64,13 @@ export async function askForField(entityName: string): Promise<FieldDefinition |
             });
             throughPath = entities[throughType];
         }
+
+        if ([FieldType.Field, FieldType.Reference, FieldType.Composition].includes(fieldType)) {
+            required = await ask({
+                type: "confirm",
+                message: "Should this field be required?",
+            });
+        }
     }
 
     const label: string = await ask({
@@ -85,18 +88,20 @@ export async function askForField(entityName: string): Promise<FieldDefinition |
         foreignKey,
         throughType,
         throughPath,
+        required,
     };
 }
 
 export interface FieldDefinition {
     field: string;
     fieldType: FieldType;
-    dataType: string;
+    dataType: EntityFieldType;
     label: string;
     entityPath?: string;
     foreignKey?: string;
     throughType?: string;
     throughPath?: string;
+    required: boolean;
 }
 
 export enum FieldType {
@@ -105,4 +110,16 @@ export enum FieldType {
     Collection = "Collection",
     Composition = "Composition",
     ManyToMany = "ManyToMany",
+}
+
+export enum EntityFieldType {
+    STRING = "STRING",
+    UUID = "UUID",
+    EMAIL = "EMAIL",
+    STRING_ARRAY = "STRING_ARRAY",
+    NUMBER = "NUMBER",
+    BOOLEAN = "BOOLEAN",
+    REFERENCE = "REFERENCE",
+    COMPOSITION = "COMPOSITION",
+    COLLECTION = "COLLECTION",
 }
