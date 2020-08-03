@@ -12,6 +12,7 @@ import {EntityField} from "../model/interface/entity-field.class";
 import {uuid} from "../../../base/type/uuid.type";
 import {serializable} from "../../../base/type/serializable.type";
 import {PermissionService} from "../auth/service/permission.service";
+import {intersection} from "lodash";
 
 @RouterModule("view")
 export default class ViewGetRouter {
@@ -20,11 +21,11 @@ export default class ViewGetRouter {
     async getObjects<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
                                                         @Path("view") viewName: string,
                                                         @Query("order") orderString: string,
+                                                        @Query("fields") requestedFields: string,
                                                         @Context() context: Dictionary<serializable>): Promise<DataResponse<ENTITY>> {
         PermissionService.checkViewPermission(viewName, RequestMethod.GET, user);
-
         const view: View<ENTITY> = ViewService.getViewNotNull(viewName);
-        const fields: string[] = ViewService.getFields(view);
+        let fields: string[] = ViewService.getFields(view, requestedFields);
         const order: Order | undefined = orderString ? ([orderString.split(":")] as Order) : undefined;
 
         const data: DataObject<ENTITY>[] = await DataService.findAll(view.entity(), ViewService.getFindOptions(view, user, context));
@@ -40,10 +41,11 @@ export default class ViewGetRouter {
     async getObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
                                                        @Path("view") viewName: string,
                                                        @Path("id") objectId: string,
+                                                       @Query("fields") requestedFields: string,
                                                        @Context() context: Dictionary<serializable>): Promise<DataResponse<ENTITY>> {
         PermissionService.checkViewPermission(viewName, RequestMethod.GET, user);
         const view: View<ENTITY> = ViewService.getViewNotNull(viewName);
-        const fields: string[] = ViewService.getFields(view);
+        const fields: string[] = ViewService.getFields(view, requestedFields);
 
         const data: DataObject<ENTITY> = await DataService.findNotNullById(view.entity(), objectId, ViewService.getFindOptions(view, user, context));
         const model = ViewService.getModelForView(view);
@@ -59,6 +61,7 @@ export default class ViewGetRouter {
                                                            @Path("view") viewName: string,
                                                            @Path("id") objectId: string,
                                                            @Path("attribute") collectionField: keyof ENTITY,
+                                                           @Query("fields") requestedFields: string,
                                                            @Context() context: Dictionary<serializable>): Promise<DataResponse<any>> {
         PermissionService.checkViewPermission(viewName, RequestMethod.GET, user);
 
@@ -72,7 +75,11 @@ export default class ViewGetRouter {
         const data: DataObject<ENTITY> = await DataService.findNotNullById(baseView.entity(), objectId, ViewService.getFindOptions(baseView, user, context));
         const model = ViewService.getModelForView(baseView);
 
-        const subFields: string[] = fields.filter(field => field.startsWith(`${String(collectionField)}.`));
+        let subFields: string[] = fields.filter(field => field.startsWith(`${String(collectionField)}.`));
+        if (requestedFields) {
+            const requestedSubFields = requestedFields.split(",").map(f => `${String(collectionField)}.${f}`);
+            subFields = intersection(subFields, requestedSubFields);
+        }
         const subData: Partial<ENTITY> = await DataService.filterFields(data, subFields) as Partial<ENTITY>;
         return {
             data: subData[collectionField],
@@ -86,6 +93,7 @@ export default class ViewGetRouter {
                                                                  @Path("id") objectId: uuid,
                                                                  @Path("attribute") collectionField: keyof ENTITY,
                                                                  @Path("subId") subObjectId: uuid,
+                                                                 @Query("fields") requestedFields: string,
                                                                  @Context() context: Dictionary<serializable>): Promise<DataResponse<any>> {
         PermissionService.checkViewPermission(viewName, RequestMethod.GET, user);
 
@@ -99,7 +107,11 @@ export default class ViewGetRouter {
         const data: DataObject<ENTITY> = await DataService.findNotNullById(baseView.entity(), objectId, ViewService.getFindOptions(baseView, user, context));
         const model = ViewService.getModelForView(baseView);
 
-        const subFields: string[] = fields.filter(field => field.startsWith(`${String(collectionField)}.`));
+        let subFields: string[] = fields.filter(field => field.startsWith(`${String(collectionField)}.`));
+        if (requestedFields) {
+            const requestedSubFields = requestedFields.split(",").map(f => `${String(collectionField)}.${f}`);
+            subFields = intersection(subFields, requestedSubFields);
+        }
         const subData: Dictionary<any, keyof ENTITY> = await DataService.filterFields(data, subFields);
 
         let subObject: DataObject<any>;

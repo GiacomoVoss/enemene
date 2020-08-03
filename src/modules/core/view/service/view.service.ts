@@ -4,7 +4,7 @@ import {FindOptions} from "sequelize";
 import {FilterService} from "../../filter/service/filter.service";
 import {EntityField} from "../../model/interface/entity-field.class";
 import {ModelService} from "../../model/service/model.service";
-import {merge, omit} from "lodash";
+import {intersection, merge, omit} from "lodash";
 import {CollectionField} from "../../model/interface/collection-field.class";
 import {ManyToManyField} from "../../model/interface/many-to-many-field.class";
 import {Dictionary} from "../../../../base/type/dictionary.type";
@@ -80,8 +80,8 @@ export class ViewService {
         return view;
     }
 
-    public static getFields(view: View<any>): string[] {
-        const fields: string[] = [];
+    public static getFields(view: View<any>, requestedFieldsString?: string): string[] {
+        let fields: string[] = [];
         let fieldName: string;
         for (const viewField of view.fields) {
             if (typeof viewField === "string") {
@@ -97,6 +97,10 @@ export class ViewService {
             if (entityField instanceof CollectionField || entityField instanceof ManyToManyField) {
                 fields.push(`${fieldName}.$count`);
             }
+        }
+
+        if (requestedFieldsString) {
+            fields = intersection(fields, requestedFieldsString.split(","));
         }
 
         return fields;

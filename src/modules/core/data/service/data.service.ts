@@ -8,12 +8,11 @@ import {CountOptions, FindOptions} from "sequelize";
 import {UuidService} from "../../service/uuid.service";
 import {ModelService} from "../../model/service/model.service";
 import {EntityField} from "../../model/interface/entity-field.class";
-import {uniq} from "lodash";
+import {isEqual, uniq} from "lodash";
 import {CollectionField} from "../../model/interface/collection-field.class";
 import {ReferenceField} from "../../model/interface/reference-field.class";
 import {CompositionField} from "../../model/interface/composition-field.class";
 import {ManyToManyField} from "../../model/interface/many-to-many-field.class";
-import {EntityFieldType} from "../../model/enum/entity-field-type.enum";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {serializable} from "../../../../base/type/serializable.type";
 import {Enemene} from "../../application/enemene";
@@ -194,22 +193,27 @@ export class DataService {
                     requestedSubFields = ModelService.getDisplayPatternFields(field.classGetter().name).map(f => f.name);
                 }
 
-                if (!value && [EntityFieldType.REFERENCE, EntityFieldType.COLLECTION].includes(field.type)) {
-                    value = await object.$get(key) as any;
+                if (isEqual(requestedSubFields, ["$count"])) {
+                    // Only object count requested.
+                    result[`${key}.$count`] = await object.$count(key);
+                } else {
+                    // Also values requested.
+                    if (!value) {
+                        value = await object.$get(key) as any;
+                    }
+
+                    if (!value) {
+                        result[key] = null;
+                    } else if (field instanceof ManyToManyField || field instanceof CollectionField) {
+                        if (requestedSubFields.includes("$count")) {
+                            result[`${key}.$count`] = value.length;
+                        }
+                        result[key] = await Promise.all((value as DataObject<any>[]).map(v => this.filterFields(v, requestedSubFields)));
+                    } else if (field instanceof CompositionField || field instanceof ReferenceField) {
+                        result[key] = await this.filterFields(value as DataObject<any>, requestedSubFields);
+                    }
                 }
 
-                if (!value) {
-                    result[key] = null;
-                } else if (field instanceof ManyToManyField || field instanceof CollectionField) {
-                    if (requestedSubFields.includes("$count")) {
-                        result[`${key}.$count`] = value.length;
-                    }
-                    if (requestedSubFields !== ["$count"]) {
-                        result[key] = await Promise.all((value as any[]).map((v => this.filterFields(v, requestedSubFields))));
-                    }
-                } else if (field instanceof CompositionField || field instanceof ReferenceField) {
-                    result[key] = await this.filterFields(value as DataObject<any>, requestedSubFields);
-                }
             } else {
                 result[key] = value ?? null;
             }
