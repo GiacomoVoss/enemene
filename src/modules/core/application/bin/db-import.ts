@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import {Sequelize} from "sequelize-typescript";
 import {Enemene} from "../enemene";
+import {Dictionary} from "../../../../base/type/dictionary.type";
 
 const YAML = require("yaml");
 
@@ -44,13 +45,13 @@ export class DbImport {
         const content = fs.readFileSync(file, "utf8");
 
         const objects = YAML.parse(content);
-        const creates = {};
+        const creates: Dictionary<object[]> = {};
         objects.forEach(object => {
             const model = Object.keys(object)[0];
             if (!creates[model]) {
                 creates[model] = [];
             }
-            creates[model].push(Object.values(object)[0]);
+            creates[model].push(Object.values(object)[0] as object);
         });
 
         const promises = [];

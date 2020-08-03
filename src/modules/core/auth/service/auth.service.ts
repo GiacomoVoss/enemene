@@ -5,10 +5,18 @@ const fs = require("fs");
 
 export class AuthService {
 
-    public static PRIVATE_KEY = fs.readFileSync("./keys/private.key", "utf8");
-    public static PUBLIC_KEY = fs.readFileSync("./keys/public.key", "utf8");
+    public static PRIVATE_KEY: string;
+    public static PUBLIC_KEY: string;
+
+    public static init(publicKeyPath: string, privateKeyPath: string): void {
+        this.PUBLIC_KEY = fs.readFileSync(publicKeyPath, "utf8");
+        this.PRIVATE_KEY = fs.readFileSync(privateKeyPath, "utf8");
+    }
 
     public static async authenticate(auth: string): Promise<AbstractUser | undefined> {
+        if (!AuthService.PUBLIC_KEY) {
+            return undefined;
+        }
         try {
             const token = auth.split(" ")[1];
             const verified = jwt.verify(token, AuthService.PUBLIC_KEY, {
@@ -21,6 +29,9 @@ export class AuthService {
     }
 
     public static sign(payload): string {
+        if (!AuthService.PUBLIC_KEY) {
+            return undefined;
+        }
         return jwt.sign(payload, AuthService.PRIVATE_KEY, {
             algorithm: "RS256",
         });

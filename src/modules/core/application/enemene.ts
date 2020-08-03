@@ -20,6 +20,7 @@ import {LogService} from "../log/service/log.service";
 import {AbstractAction} from "../action/class/abstract-action.class";
 import {ActionService} from "../action/service/action.service";
 import ActionRouter from "../action/action.router";
+import {AuthService} from "../auth/service/auth.service";
 import bodyParser = require("body-parser");
 
 require("express-async-errors");
@@ -44,6 +45,9 @@ export class Enemene {
         this.server.use(allowHeaders);
         this.server.use(bodyParser.json());
         Enemene.log[config.logLevel.toLowerCase()]("Server", "Log level: " + config.logLevel.toUpperCase());
+        if (this.config.security) {
+            AuthService.init(this.config.security.jwtPublicKeyPath, this.config.security.jwtPrivateKeyPath);
+        }
 
         this.config.port = `${this.normalizePort(config.port)}`;
 
@@ -110,20 +114,23 @@ export class Enemene {
                 });
             });
 
-        if (this.config.proxyFor) {
-            this.server.use("/", proxy(this.config.proxyFor, {
-                filter: (req) => {
-                    return !req.path.startsWith("/api");
-                }
-            }));
-            Enemene.log.info("Server", `Proxying "${this.config.proxyFor}".`);
-            RouterService.loadPaths(this.server);
-        } else {
-            this.server.use("/", express.static(path.join(__dirname, "..", "frontend", "dist")));
-            RouterService.loadPaths(this.server);
-            this.server.get("/*", (req, res) => {
-                res.sendFile(path.join(__dirname, "..", "frontend", "dist", "index.html"));
-            });
+        if (this.config.frontend) {
+            if (this.config.frontend.startsWith("http://") || this.config.frontend.startsWith("https://")) {
+                this.server.use("/", proxy(this.config.frontend, {
+                    filter: (req) => {
+                        return !req.path.startsWith("/api");
+                    }
+                }));
+                RouterService.loadPaths(this.server);
+                Enemene.log.info("Server", `Proxying frontend "${this.config.frontend}".`);
+            } else {
+                this.server.use("/", express.static(this.config.frontend));
+                RouterService.loadPaths(this.server);
+                this.server.get("/*", (req, res) => {
+                    res.sendFile(path.join(this.config.frontend, "index.html"));
+                });
+                Enemene.log.info("Server", `Delivering frontend from "${this.config.frontend}".`);
+            }
         }
     }
 

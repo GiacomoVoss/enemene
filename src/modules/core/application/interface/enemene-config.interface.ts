@@ -52,10 +52,18 @@ export interface EnemeneConfig {
         password: string;
     }
 
+    security?: {
+        jwtPrivateKeyPath: string;
+        jwtPublicKeyPath: string;
+    }
+
     userModel: typeof AbstractUser;
 
     /**
-     * An optional URL which will be proxied for all requests that don't start with "/api".
+     * This can contain 2 possible values:
+     * 1. a url starting with http/https to a running server, which will be proxied through the enemene server.
+     * 2. a file path to the folder where the static frontend files and an index.html file live.
+     * Both will be delivered for any request not starting with "/api".
      */
-    proxyFor?: string;
+    frontend?: string;
 }

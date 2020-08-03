@@ -166,11 +166,11 @@ export class DataService {
                     }
                 } else if (field instanceof ReferenceField) {
                     const referenceObject = await DataService.findNotNullById(field.classGetter(), data[key]);
-                    object.setDataValue(field.foreignKey as keyof T, referenceObject.id as any);
+                    object[field.foreignKey as keyof T] = referenceObject.id as any;
                 } else if (field instanceof CollectionField) {
                     throw new Error("Cannot save collections directly.");
                 } else {
-                    object.setDataValue(key as keyof T, data[key]);
+                    object[key as keyof T] = data[key];
                 }
             }
         }
@@ -185,7 +185,7 @@ export class DataService {
             .filter((field: EntityField) => requestedBaseFields.includes(field.name) || requestedBaseFields.includes("*"));
         for (const field of fields) {
             const key: keyof DataObject<any> = field.name as keyof DataObject<any>;
-            let value = object.getDataValue(key);
+            let value = object[key];
             if (field instanceof ManyToManyField || field instanceof CompositionField || field instanceof CollectionField || field instanceof ReferenceField) {
                 let requestedSubFields: string[] = requestedFields
                     .filter((f: string) => f.startsWith(`${key}.`))
