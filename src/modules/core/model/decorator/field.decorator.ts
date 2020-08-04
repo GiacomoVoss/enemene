@@ -19,6 +19,9 @@ export function Field(label: string, type: EntityFieldType = EntityFieldType.STR
             options.set = function (this: Model, value: string) {
                 this.setDataValue(propertyKey, value);
             };
+        } else if (Array.isArray(type)) {
+            options.type = DataTypes.ENUM;
+            options.values = type;
         }
         sq.Column(options)(target, propertyKey, descriptor);
     };
