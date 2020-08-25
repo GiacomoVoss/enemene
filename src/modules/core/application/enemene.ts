@@ -24,6 +24,7 @@ import {AuthService} from "../auth/service/auth.service";
 import https, {Server} from "https";
 import * as fs from "fs";
 import ViewPutRouter from "../view/view-put.router";
+import {Role, RoutePermission, ViewPermission} from "../auth";
 import bodyParser = require("body-parser");
 
 require("express-async-errors");
@@ -65,8 +66,12 @@ export class Enemene {
             dialect: "mysql",
             timezone: "+02:00",
             modelPaths: [
-                __dirname + "/../**/*.model.js",
                 process.cwd() + "/**/*.model.js",
+            ],
+            models: [
+                Role,
+                RoutePermission,
+                ViewPermission,
             ],
             modelMatch: (filename, member) => {
                 const kebab: string[] = filename.substring(0, filename.indexOf(".model")).split("-");

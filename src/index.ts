@@ -7,3 +7,4 @@ export * from "./modules/core/data";
 export * from "./modules/core/model";
 export * from "./modules/core/filter";
 export * from "./modules/core/router";
+export {Op} from "sequelize";
