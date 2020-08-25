@@ -66,7 +66,7 @@ export class Enemene {
             timezone: "+02:00",
             modelPaths: [
                 __dirname + "/../**/*.model.js",
-                process.cwd() + "/dist/**/*.model.js",
+                process.cwd() + "/**/*.model.js",
             ],
             modelMatch: (filename, member) => {
                 const kebab: string[] = filename.substring(0, filename.indexOf(".model")).split("-");
