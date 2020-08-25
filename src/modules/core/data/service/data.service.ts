@@ -1,7 +1,6 @@
 import {ObjectNotFoundError} from "../../error/object-not-found.error";
 import {DataObject} from "../../model/data-object.model";
 import {ValidationService} from "../../validation/service/validation.service";
-import {Validate} from "../../validation/interface/validate.interface";
 import {SchemaMap} from "@hapi/joi";
 import {UnauthorizedError} from "../../auth/error/unauthorized.error";
 import {CountOptions, FindOptions} from "sequelize";
@@ -16,6 +15,9 @@ import {ManyToManyField} from "../../model/interface/many-to-many-field.class";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {serializable} from "../../../../base/type/serializable.type";
 import {Enemene} from "../../application/enemene";
+import {OrderItem} from "sequelize/types/lib/model";
+import {uuid} from "../../../../base/type/uuid.type";
+import {AfterCreateHook, BeforeCreateHook} from "..";
 
 /**
  * Service to retrieve data from the model.
@@ -27,19 +29,13 @@ export class DataService {
      * @param options   - Optional sequelize IFindOptions.
      */
     public static async count<T extends DataObject<T>>(clazz: any, options?: FindOptions): Promise<number> {
-        return Enemene.app.db.transaction(async t => {
-            const countOptions: CountOptions = {
-                include: [],
-                distinct: true,
-                transaction: t
-            };
-            if (Object.keys(clazz.rawAttributes).includes("id")) {
-                countOptions.col = "id";
-            }
-            return clazz.count({
-                ...options,
-                ...countOptions
-            });
+        const countOptions: CountOptions = {
+            col: "id",
+            distinct: true,
+        };
+        return clazz.count({
+            ...options,
+            ...countOptions
         });
     }
 
@@ -59,32 +55,38 @@ export class DataService {
     }
 
     public static async findNotNull<ENTITY extends DataObject<ENTITY>>(clazz: any, options?: FindOptions): Promise<ENTITY> {
-        return Enemene.app.db.transaction(async t => {
-            const object: ENTITY = await clazz.findOne({
-                ...options,
-                transaction: t,
-            });
-            if (!object) {
-                throw new ObjectNotFoundError(clazz.name);
-            }
-            object.$entity = clazz.name;
-            return object;
+        const object: ENTITY = await clazz.findOne({
+            ...options,
         });
+        if (!object) {
+            throw new ObjectNotFoundError(clazz.name);
+        }
+        object.$entity = clazz.name;
+        return object;
     }
 
 
-    public static async findNotNullById<ENTITY extends DataObject<ENTITY>>(clazz: any, id: number | string, options?: FindOptions): Promise<ENTITY | null> {
-        return Enemene.app.db.transaction(async t => {
-            const object: ENTITY = await clazz.findByPk(id, {
-                ...options,
-                transaction: t,
-            });
-            if (!object) {
-                throw new ObjectNotFoundError(clazz.name);
-            }
-            object.$entity = clazz.name;
-            return object;
+    public static async findNotNullById<ENTITY extends DataObject<ENTITY>>(clazz: any, id: number | string, options?: FindOptions): Promise<ENTITY> {
+        const object: ENTITY = await clazz.findByPk(id, {
+            ...options,
         });
+        if (!object) {
+            throw new ObjectNotFoundError(clazz.name);
+        }
+        object.$entity = clazz.name;
+        return object;
+    }
+
+
+    public static async findById<ENTITY extends DataObject<ENTITY>>(clazz: any, id: number | string, options?: FindOptions): Promise<ENTITY | null> {
+        const object: ENTITY = await clazz.findByPk(id, {
+            ...options,
+        });
+        if (!object) {
+            return null;
+        }
+        object.$entity = clazz.name;
+        return object;
     }
 
     /**
@@ -95,14 +97,14 @@ export class DataService {
      * @param data              - The data to populate the object with.
      * @param validationSchema  - (optional) Validation schema.
      */
-    public static async update<T extends DataObject<T>>(clazz: any, object: Partial<DataObject<T>> | Validate, data: any, validationSchema?: SchemaMap): Promise<void> {
+    public static async update<T extends DataObject<T>>(clazz: any, object: DataObject<T>, data: any, validationSchema?: SchemaMap): Promise<void> {
         await Enemene.app.db.transaction(async t => {
-            delete data.id;
-            (object as DataObject<T>).setAttributes(data);
+            data.$entity = clazz.name;
+            object = await DataService.populate(data, object);
 
-            ValidationService.validate(clazz, object as DataObject<T>);
+            ValidationService.validate(clazz, object);
 
-            await (object as DataObject<T>).save({transaction: t});
+            await object.save({transaction: t});
         });
     }
 
@@ -112,27 +114,30 @@ export class DataService {
      * @param clazz             - The class the object should be of.
      * @param data              - The data to populate the object with.
      * @param [validationSchema]- Validation schema.
-     * @param [filter]          - Filter that the created object has to meet.
+     * @param [options]          - Filter that the created object has to meet.
      */
-    public static async create<T extends DataObject<T>>(clazz: any, data: Dictionary<serializable>, validationSchema?: SchemaMap, filter?: any): Promise<T> {
+    public static async create<T extends DataObject<T>>(clazz: any, data: Dictionary<serializable>, validationSchema?: SchemaMap, options: FindOptions = {}): Promise<T> {
         let object: T = null;
 
         await Enemene.app.db.transaction(async t => {
-            data.id = UuidService.getUuid();
             data.$entity = clazz.name;
             object = await DataService.populate(data);
 
             ValidationService.validate(clazz, object as DataObject<T>);
 
+            if ((object as unknown as BeforeCreateHook).onBeforeCreate) {
+                await (object as unknown as BeforeCreateHook).onBeforeCreate();
+            }
+
             await (object as DataObject<T>).save({transaction: t});
 
-            if (filter) {
+            if (options.where) {
                 const where = {};
                 clazz.primaryKeyAttributes.forEach(attribute => where[attribute] = object[attribute]);
                 const found = await clazz.count({
                     where: {
                         ...where,
-                        ...filter
+                        ...(options.where ?? {})
                     },
                     transaction: t
                 });
@@ -141,16 +146,97 @@ export class DataService {
                     throw new UnauthorizedError();
                 }
             }
+
+            if ((object as unknown as AfterCreateHook).onAfterCreate) {
+                await (object as unknown as AfterCreateHook).onAfterCreate();
+            }
         });
-        return object;
+        return this.findById(clazz, object.id as uuid);
     }
 
-    public static async populate<T extends DataObject<T>>(data: Dictionary<any>): Promise<T> {
-        const object: T = Enemene.app.db.model(data.$entity).build({
-            id: data.id,
-        }, {
-            isNewRecord: true,
-        }) as T;
+    /**
+     * Creates multiple objects with validation.
+     *
+     * @param clazz             - The class the object should be of.
+     * @param data              - The data to populate the objects with.
+     * @param [validationSchema]- Validation schema.
+     * @param [filter]          - Filter that the created object has to meet.
+     */
+    public static async bulkCreate<T extends DataObject<T>>(clazz: any, data: Dictionary<serializable>[], validationSchema?: SchemaMap, filter?: any): Promise<T[]> {
+        let objects: T[] = [];
+        await Enemene.app.db.transaction(async t => {
+            let dataObjects: Dictionary<serializable>[] = [];
+            for (const dataObject of data) {
+                dataObject.id = UuidService.getUuid();
+                dataObject.$entity = clazz.name;
+                dataObjects.push(dataObject);
+            }
+
+            objects = await clazz.bulkCreate(dataObjects, {transaction: t});
+
+            // if (filter) {
+            //     const where = {};
+            //     clazz.primaryKeyAttributes.forEach(attribute => where[attribute] = object[attribute]);
+            //     const found = await clazz.count({
+            //         where: {
+            //             ...where,
+            //             ...filter
+            //         },
+            //         transaction: t
+            //     });
+            //
+            //     if (found != 1) {
+            //         throw new UnauthorizedError();
+            //     }
+            // }
+        });
+        return objects;
+    }
+
+    public static getFindOptions(order?: string, limit?: string, offset?: string): FindOptions {
+        const findOptions: FindOptions = {};
+
+        if (order) {
+            let ordersArray: OrderItem[] = order.split(",").map((orderToken: string) => {
+                let orderArray: string[] = orderToken.split(":");
+                if (orderArray.length === 1) {
+                    orderArray.push("ASC");
+                } else if (orderArray.length > 2) {
+                    orderArray = orderArray.slice(0, 2);
+                }
+                if (orderArray.length === 2) {
+                    return orderArray as OrderItem;
+                }
+
+                return undefined;
+            })
+                .filter(orderArray => !!orderArray);
+            if (ordersArray.length) {
+                findOptions.order = ordersArray;
+            }
+        }
+        if (limit && !isNaN(parseInt(limit))) {
+            findOptions.limit = parseInt(limit);
+        }
+
+        if (offset && !isNaN(parseInt(offset))) {
+            findOptions.offset = parseInt(offset);
+        }
+
+        return findOptions;
+    }
+
+    public static async populate<T extends DataObject<T>>(data: Dictionary<any>, originalData?: T): Promise<T> {
+        let object: T;
+        if (originalData) {
+            object = originalData;
+        } else {
+            object = Enemene.app.db.model(data.$entity).build({
+                id: UuidService.getUuid(),
+            }, {
+                isNewRecord: true,
+            }) as T;
+        }
         const fields: Dictionary<EntityField, keyof T> = ModelService.getFields(data.$entity);
         for (const [key, field] of Object.entries(fields)) {
             if (data[key]) {
@@ -164,7 +250,8 @@ export class DataService {
                         object.$set(key as keyof T, subObject);
                     }
                 } else if (field instanceof ReferenceField) {
-                    const referenceObject = await DataService.findNotNullById(field.classGetter(), data[key]);
+                    const subObjectId: uuid = data[key] ?? data[field.foreignKey];
+                    const referenceObject = await DataService.findNotNullById(field.classGetter(), subObjectId);
                     object[field.foreignKey as keyof T] = referenceObject.id as any;
                 } else if (field instanceof CollectionField) {
                     throw new Error("Cannot save collections directly.");

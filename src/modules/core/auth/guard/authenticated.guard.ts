@@ -7,17 +7,17 @@ export const authenticatedGuard = async (req: SecureRequest, res: Response, next
 
     const token: string = req.header("Authorization");
     if (!token) {
-        return res.status(401).end("Invalid token");
+        return next();
     }
 
     var user: AbstractUser;
     try {
         user = await AuthService.authenticate(token);
         if (!user) {
-            return res.status(401).end("Invalid token");
+            return next();
         }
     } catch (error) {
-        res.status(403).end();
+        return next();
     }
 
     req.payload = user;

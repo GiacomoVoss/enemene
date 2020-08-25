@@ -1,7 +1,9 @@
 export namespace EntityFieldType {
     export const STRING = "STRING";
+    export const TEXT = "TEXT";
     export const UUID = "UUID";
     export const EMAIL = "EMAIL";
+    export const DATE = "DATE";
     export const STRING_ARRAY = "STRING_ARRAY";
     export const NUMBER = "NUMBER";
     export const BOOLEAN = "BOOLEAN";

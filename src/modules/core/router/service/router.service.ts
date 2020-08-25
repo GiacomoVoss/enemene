@@ -11,6 +11,7 @@ import {RuntimeError} from "../../interface/runtime-error.interface";
 import {SecureRequest} from "../../auth/interface/secure-request.interface";
 import {PermissionService} from "../../auth/service/permission.service";
 import {Enemene} from "../../../..";
+import {InputValidationError} from "../../validation/error/input-validation.error";
 
 export class RouterService {
 
@@ -56,17 +57,14 @@ export class RouterService {
             paths.sort((entry1: string, entry2: string) => entry2.length - entry1.length);
             paths.forEach((path: string) => {
                 const pathDefinition: PathDefinition = this.paths[method][path];
-                let handlers: express.RequestHandler[] = [(req, res, next) => this.handler(req as SecureRequest, res, next, pathDefinition)];
-                if (!pathDefinition.isPublic) {
-                    handlers = [
-                        authenticatedGuard,
-                        (req: SecureRequest, res: Response, next: NextFunction) => {
-                            PermissionService.checkRoutePermission(path, pathDefinition, req.payload);
-                            next();
-                        },
-                        ...handlers,
-                    ];
-                }
+                let handlers: express.RequestHandler[] = [
+                    authenticatedGuard,
+                    (req: SecureRequest, res: Response, next: NextFunction) => {
+                        PermissionService.checkRoutePermission(path, pathDefinition, req.payload);
+                        next();
+                    },
+                    (req, res, next) => this.handler(req as SecureRequest, res, next, pathDefinition),
+                ];
                 switch (pathDefinition.method) {
                     case RequestMethod.GET:
                         app.get(`/api${path}`, ...handlers, this.logError);
@@ -91,29 +89,46 @@ export class RouterService {
     private static resolveParameter(req: SecureRequest, res: Response, param: string[]): any {
         const [paramType, value] = param;
         let context: Dictionary<string>;
+        let parameterValue: any = undefined;
+        let optional: boolean = false;
         switch (paramType) {
             case ParameterType.REQUEST:
-                return req;
+                parameterValue = req;
+                break;
             case ParameterType.RESPONSE:
-                return res;
+                parameterValue = res;
+                break;
             case ParameterType.PATH:
-                return req.params[value];
+                parameterValue = req.params[value];
+                break;
             case ParameterType.QUERY:
-                return req.query[value] as string;
+                parameterValue = req.query[value] as string;
+                optional = true;
+                break;
             case ParameterType.BODY:
                 if (value) {
-                    return req.body[value];
+                    parameterValue = req.body[value];
+                } else {
+                    parameterValue = req.body;
                 }
-                return req.body;
+                break;
             case ParameterType.CURRENT_USER:
-                return req.payload as AbstractUser;
+                parameterValue = req.payload as AbstractUser;
+                optional = true;
+                break;
             case ParameterType.CONTEXT:
                 context = req.query["context"] ? JSON.parse(req.query["context"] as string) : {};
                 if (value) {
-                    return context[value];
+                    parameterValue = context[value];
+                } else {
+                    parameterValue = context;
                 }
-                return context;
         }
+        if (parameterValue === undefined && !optional) {
+            throw new InputValidationError(`The ${paramType} parameter "${value}" is missing.`);
+        }
+
+        return parameterValue;
     }
 
     /**
@@ -131,7 +146,8 @@ export class RouterService {
         if ([400, 401, 403, 404].includes(statusCode)) {
             Enemene.log.info("Access", err.message);
         } else {
-            Enemene.log.error("Access", err);
+            Enemene.log.error("Access", err.message);
+            Enemene.log.error("Access", err.stack);
         }
 
         return res.status(statusCode).send({

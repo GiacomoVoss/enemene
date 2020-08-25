@@ -60,7 +60,7 @@ export class FilterService {
             });
         }
 
-        if (result.match(/\d+(\.\d+)?/)) {
+        if (result.match(/^\d+(\.\d+)?$/)) {
             return parseFloat(result);
         }
 

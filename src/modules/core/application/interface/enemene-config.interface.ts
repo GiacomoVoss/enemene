@@ -57,6 +57,12 @@ export interface EnemeneConfig {
         jwtPublicKeyPath: string;
     }
 
+    ssl?: {
+        sslCertPath: string;
+        sslKeyPath: string;
+        sslPassphrase?: string;
+    }
+
     userModel: typeof AbstractUser;
 
     /**

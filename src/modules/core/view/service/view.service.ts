@@ -10,8 +10,9 @@ import {ManyToManyField} from "../../model/interface/many-to-many-field.class";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {AbstractUser} from "../../auth";
 import chalk from "chalk";
-import {Enemene} from "../../../..";
+import {DataObject, DataResponse, DataService, Enemene} from "../../../..";
 import {ActionConfiguration} from "../../action/interface/action-configuration.interface";
+import {serializable} from "../../../../base/type/serializable.type";
 
 /**
  * Service for handling views for data manipulation.
@@ -44,6 +45,30 @@ export class ViewService {
         if (!ViewService.VIEWS[name]) {
             ViewService.VIEWS[name] = view;
         }
+    }
+
+    public static async findAllByView<ENTITY extends DataObject<ENTITY>>(view: View<any>, requestedFields: string, user: AbstractUser, context: Dictionary<serializable> = {}, find?: FindOptions): Promise<DataResponse<ENTITY>> {
+        let fields: string[] = ViewService.getFields(view, requestedFields);
+
+        const data: DataObject<ENTITY>[] = await DataService.findAll(view.entity(), ViewService.getFindOptions(view, user, context, find));
+        const model = ViewService.getModelForView(view);
+        return {
+            data: await Promise.all(data.map((object: DataObject<ENTITY>) => DataService.filterFields(object, fields))) as Partial<ENTITY>[],
+            model,
+            actions: ViewService.getViewActions(view),
+        };
+    }
+
+    public static async findByIdByView<ENTITY extends DataObject<ENTITY>>(view: View<any>, id: string, requestedFields: string, user: AbstractUser, context: Dictionary<serializable> = {}): Promise<DataResponse<ENTITY>> {
+        let fields: string[] = ViewService.getFields(view, requestedFields);
+
+        const data: DataObject<ENTITY> = await DataService.findNotNullById(view.entity(), id, ViewService.getFindOptions(view, user, context));
+        const model = ViewService.getModelForView(view);
+        return {
+            data: await DataService.filterFields(data, fields) as Partial<ENTITY>,
+            model,
+            actions: ViewService.getViewActions(view),
+        };
     }
 
     /**
@@ -99,23 +124,29 @@ export class ViewService {
             }
         }
 
-        if (requestedFieldsString) {
+        if (requestedFieldsString && requestedFieldsString !== "*") {
             fields = intersection(fields, requestedFieldsString.split(","));
         }
 
         return fields;
     }
 
-    public static getFindOptions(view: View<any>, user: AbstractUser, additionalContext: object = {}): FindOptions {
+    public static getFindOptions(view: View<any>, user?: AbstractUser, additionalContext: object = {}, additionalFindOptions: FindOptions = {}): FindOptions {
         const context: any = {
-            currentUserId: user.id,
-            currentUserRoleId: user.roleId,
             ...additionalContext,
         };
+        if (user) {
+            context.currentUserId = user.id;
+            context.currentUserRoleId = user.roleId;
+        }
+
         let find: FindOptions = {};
         if (view.filter) {
             find = FilterService.toSequelize(view.filter, context);
         }
+
+        find.order = additionalFindOptions.order ?? view.defaultOrder;
+        find.limit = additionalFindOptions.limit;
 
         return find;
     }

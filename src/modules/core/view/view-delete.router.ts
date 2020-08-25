@@ -1,20 +1,20 @@
-import {Context, CurrentUser, Delete, Path, Post, RouterModule} from "../router";
+import {Context, CurrentUser, Delete, Path, RouterModule} from "../router";
 import {ViewService} from "./service/view.service";
 import {DataService} from "../data";
 import {DataObject} from "../model";
 import {AbstractUser} from "../auth";
 import {RequestMethod} from "../router/enum/request-method.enum";
 import {View, ViewFieldDefinition} from "./";
-import {UnauthorizedError} from "../auth/error/unauthorized.error";
 import {uuid} from "../../../base/type/uuid.type";
 import {Dictionary} from "../../../base/type/dictionary.type";
 import {serializable} from "../../../base/type/serializable.type";
 import {PermissionService} from "../auth/service/permission.service";
+import {ObjectNotFoundError} from "../error/object-not-found.error";
 
 @RouterModule("view")
 export default class ViewDeleteRouter {
 
-    @Delete("/:view/:id")
+    @Delete("/:view/:id", true)
     async deleteObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
                                                           @Path("view") viewName: string,
                                                           @Path("id") objectId: uuid,
@@ -27,7 +27,7 @@ export default class ViewDeleteRouter {
         object.destroy();
     }
 
-    @Post("/:view/:id/:attribute/:subId")
+    @Delete("/:view/:id/:attribute/:subId", true)
     async deleteCollectionObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
                                                                     @Path("view") viewName: string,
                                                                     @Path("id") objectId: uuid,
@@ -38,10 +38,11 @@ export default class ViewDeleteRouter {
 
         const baseView: View<ENTITY> = ViewService.getViewNotNull(viewName);
         if (!baseView.fields.find(field => (field as string) === collectionField || (field as ViewFieldDefinition<ENTITY, any>).field === collectionField)) {
-            throw new UnauthorizedError();
+            throw new ObjectNotFoundError();
         }
 
         const object: ENTITY = await DataService.findNotNullById(baseView.entity(), objectId, ViewService.getFindOptions(baseView, user, context));
         await object.$remove(collectionField as string, subObjectId);
+        
     }
 }

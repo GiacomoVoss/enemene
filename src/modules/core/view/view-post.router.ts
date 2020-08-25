@@ -19,7 +19,7 @@ import {PermissionService} from "../auth/service/permission.service";
 @RouterModule("view")
 export default class ViewPostRouter {
 
-    @Post("/:view")
+    @Post("/:view", true)
     async createObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
                                                           @Path("view") viewName: string,
                                                           @Body() data: Dictionary<serializable>,
@@ -29,16 +29,11 @@ export default class ViewPostRouter {
         const fields: string[] = ViewService.getFields(view);
         const filteredData: Dictionary<serializable> = pick(data, fields);
 
-        const object: DataObject<ENTITY> = await DataService.create(view.entity(), filteredData, undefined, ViewService.getFindOptions(view, user, context));
-        const model = ViewService.getModelForView(view);
-
-        return {
-            data: object as Partial<ENTITY>,
-            model,
-        };
+        let object = await DataService.create(view.entity(), filteredData, undefined, ViewService.getFindOptions(view, user, context));
+        return ViewService.findByIdByView(view, object.id, "*", user, context);
     }
 
-    @Post("/:view/:id/:attribute")
+    @Post("/:view/:id/:attribute", true)
     async createCollectionObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
                                                                     @Path("view") viewName: string,
                                                                     @Path("id") objectId: uuid,
@@ -65,9 +60,11 @@ export default class ViewPostRouter {
 
         let object: DataObject<ENTITY>;
         if (fieldModel instanceof CollectionField) {
+            filteredData[fieldModel.foreignKey] = objectId;
             object = await DataService.create(fieldModel.classGetter(), filteredData);
             await baseObject.$add(fieldModel.name as any, object);
         } else if (fieldModel instanceof CompositionField) {
+            filteredData[fieldModel.foreignKey] = objectId;
             object = await DataService.create(fieldModel.classGetter(), filteredData);
             await baseObject.$set(fieldModel.name as any, object);
         }

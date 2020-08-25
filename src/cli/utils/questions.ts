@@ -64,13 +64,13 @@ export async function askForField(entityName: string): Promise<FieldDefinition |
             });
             throughPath = entities[throughType];
         }
+    }
 
-        if ([FieldType.Field, FieldType.Reference, FieldType.Composition].includes(fieldType)) {
-            required = await ask({
-                type: "confirm",
-                message: "Should this field be required?",
-            });
-        }
+    if ([FieldType.Field, FieldType.Reference, FieldType.Composition].includes(fieldType)) {
+        required = await ask({
+            type: "confirm",
+            message: "Should this field be required?",
+        });
     }
 
     const label: string = await ask({

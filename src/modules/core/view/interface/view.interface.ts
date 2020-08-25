@@ -16,7 +16,7 @@ export interface View<ENTITY extends DataObject<ENTITY>> {
     /**
      * Fields to include.
      */
-    fields: (ViewFieldDefinition<ENTITY, any> | keyof ENTITY)[];
+    fields: (ViewFieldDefinition<ENTITY, any> | keyof ENTITY | string)[];
 
     /**
      * Validation schema for updating/creating objects through the view.

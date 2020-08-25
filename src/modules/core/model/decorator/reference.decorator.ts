@@ -6,7 +6,7 @@ import {Dictionary} from "../../../../base/type/dictionary.type";
 import {ReferenceField} from "../interface/reference-field.class";
 import {EntityFieldType} from "../enum/entity-field-type.enum";
 
-export function Reference(label: string, classGetter: () => any, required: boolean = true): Function {
+export function Reference(label: string, classGetter: () => any, required: boolean = false): Function {
     return function (target, propertyKey): void {
         const fields: Dictionary<EntityField> = ModelService.FIELDS[target.constructor.name] || {};
         fields[propertyKey] = new ReferenceField(propertyKey, label, classGetter, `${propertyKey}Id`, false);

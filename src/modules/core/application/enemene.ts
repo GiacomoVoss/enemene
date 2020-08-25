@@ -1,7 +1,7 @@
 import {allowHeaders} from "../middleware/allow-headers.middleware";
 import proxy from "express-http-proxy";
 import {RouterService} from "../router/service/router.service";
-import express from "express";
+import express, {NextFunction, Request, Response} from "express";
 import path from "path";
 import {View, ViewService} from "../view";
 import {EnemeneConfig} from "./interface/enemene-config.interface";
@@ -21,6 +21,9 @@ import {AbstractAction} from "../action/class/abstract-action.class";
 import {ActionService} from "../action/service/action.service";
 import ActionRouter from "../action/action.router";
 import {AuthService} from "../auth/service/auth.service";
+import https, {Server} from "https";
+import * as fs from "fs";
+import ViewPutRouter from "../view/view-put.router";
 import bodyParser = require("body-parser");
 
 require("express-async-errors");
@@ -33,17 +36,19 @@ export class Enemene {
 
     public static log: LogService;
 
-    public server: express.Application;
+    private services: Dictionary<any> = {};
+
+    public express: express.Application;
 
     public db: Sequelize;
 
     public devMode: boolean;
 
     constructor(public config: EnemeneConfig) {
-        this.server = express();
+        this.express = express();
         this.devMode = process.env.NODE_ENV === "development";
-        this.server.use(allowHeaders);
-        this.server.use(bodyParser.json());
+        this.express.use(allowHeaders);
+        this.express.use(bodyParser.json());
         Enemene.log[config.logLevel.toLowerCase()]("Server", "Log level: " + config.logLevel.toUpperCase());
         if (this.config.security) {
             AuthService.init(this.config.security.jwtPublicKeyPath, this.config.security.jwtPrivateKeyPath);
@@ -82,6 +87,10 @@ export class Enemene {
         return Enemene.app;
     }
 
+    public getSingleton<ENTITY>(clazz: new () => ENTITY): ENTITY {
+        return this.services[clazz.name];
+    }
+
     /**
      * Import database from fixtures and terminate.
      */
@@ -90,18 +99,27 @@ export class Enemene {
         process.exit(0);
     }
 
-    public async setup(routers: Dictionary<Function>, views: Dictionary<View<any>>, actions: Dictionary<typeof AbstractAction>): Promise<void> {
+    public async setup(routers: Dictionary<Function>,
+                       views: Dictionary<View<any>>,
+                       actions?: Dictionary<typeof AbstractAction>,
+                       services?: Dictionary<Function>): Promise<void> {
         await this.setupRouters({
             ...routers,
             AuthRouter,
             ActionRouter,
             ViewGetRouter,
             ViewPostRouter,
+            ViewPutRouter,
             ViewDeleteRouter,
             ModelRouter,
         });
         await this.setupViews(views);
-        await this.setupActions(actions);
+        if (actions) {
+            await this.setupActions(actions);
+        }
+        if (services) {
+            await this.setupServices(services);
+        }
         await PermissionService.buildCache();
     }
 
@@ -116,17 +134,17 @@ export class Enemene {
 
         if (this.config.frontend) {
             if (this.config.frontend.startsWith("http://") || this.config.frontend.startsWith("https://")) {
-                this.server.use("/", proxy(this.config.frontend, {
+                this.express.use("/", proxy(this.config.frontend, {
                     filter: (req) => {
                         return !req.path.startsWith("/api");
                     }
                 }));
-                RouterService.loadPaths(this.server);
+                RouterService.loadPaths(this.express);
                 Enemene.log.info("Server", `Proxying frontend "${this.config.frontend}".`);
             } else {
-                this.server.use("/", express.static(this.config.frontend));
-                RouterService.loadPaths(this.server);
-                this.server.get("/*", (req, res) => {
+                this.express.use("/", express.static(this.config.frontend));
+                RouterService.loadPaths(this.express);
+                this.express.get("/*", (req, res) => {
                     res.sendFile(path.join(this.config.frontend, "index.html"));
                 });
                 Enemene.log.info("Server", `Delivering frontend from "${this.config.frontend}".`);
@@ -142,10 +160,45 @@ export class Enemene {
         await ActionService.init(actions);
     }
 
+    private async setupServices(services: Dictionary<Function>): Promise<void> {
+        for (const name in services) {
+            if (services.hasOwnProperty(name)) {
+                const serviceClass = services[name] as any;
+                const instance = new serviceClass();
+                this.services[name] = instance;
+                Enemene.log.info("Server", "Registering singleton service " + name);
+                if (instance.onStart) {
+                    await instance.onStart();
+                }
+            }
+        }
+    }
+
     public start(): void {
-        this.server.listen(this.config.port, () => {
-            Enemene.log.info("Server", "Listening on port: " + this.config.port);
-        });
+        if (this.config.ssl) {
+            this.express.use((req: Request, res: Response, next: NextFunction) => {
+                if (req.secure) {
+                    // request was via https, so do no special handling
+                    next();
+                } else {
+                    // request was via http, so redirect to https
+                    res.redirect("https://" + req.headers.host + req.url);
+                }
+            });
+            https.createServer({
+                    key: fs.readFileSync(this.config.ssl.sslKeyPath),
+                    cert: fs.readFileSync(this.config.ssl.sslCertPath),
+                    passphrase: this.config.ssl.sslPassphrase,
+                },
+                this.express
+            ).listen(this.config.port, () => {
+                Enemene.log.info("Server", "Listening on port: " + this.config.port);
+            });
+        } else {
+            this.express.listen(this.config.port, () => {
+                Enemene.log.info("Server", "Listening on port: " + this.config.port);
+            });
+        }
     }
 
     private normalizePort(val: number | string): number {

@@ -1,11 +1,7 @@
 import {NextFunction, Request, Response} from "express";
 import {Enemene} from "../application/enemene";
 
-const ALLOWED_ORIGINS = [
-    "https://admin.itc-dortmund.de",
-    "https://itc-dortmund.de",
-    "https://www.itc-dortmund.de",
-];
+const ALLOWED_ORIGINS = [];
 
 export const allowHeaders = async (req: Request, res: Response, next: NextFunction) => {
     const allowedOrigins: string[] = JSON.parse(JSON.stringify(ALLOWED_ORIGINS));

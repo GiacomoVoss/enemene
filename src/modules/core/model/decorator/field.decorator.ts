@@ -14,11 +14,14 @@ export function Field(label: string, type: EntityFieldType = EntityFieldType.STR
         if (type === EntityFieldType.STRING_ARRAY) {
             options.type = DataTypes.JSON;
             options.get = function (this: Model) {
-                return JSON.parse(this.getDataValue(propertyKey));
+                const value = this.getDataValue(propertyKey);
+                return value ? JSON.parse(value) : undefined;
             };
             options.set = function (this: Model, value: string) {
                 this.setDataValue(propertyKey, value);
             };
+        } else if (type === EntityFieldType.TEXT) {
+            options.type = DataTypes.TEXT;
         } else if (Array.isArray(type)) {
             options.type = DataTypes.ENUM;
             options.values = type;
