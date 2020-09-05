@@ -16,9 +16,9 @@ export class DbImport {
         const database: string = this.db.config.database;
         return this.db.transaction(async t => {
             Enemene.log.info(this.constructor.name, "Clearing database");
-            await this.db.query(`DROP DATABASE IF EXISTS ${database}`);
-            await this.db.query(`CREATE DATABASE ${database} CHARACTER SET = utf8 COLLATE = utf8_general_ci`);
-            await this.db.query(`USE ${database}`);
+            await this.db.query(`DROP DATABASE IF EXISTS \`${database}\``);
+            await this.db.query(`CREATE DATABASE \`${database}\` CHARACTER SET = utf8 COLLATE = utf8_general_ci`);
+            await this.db.query(`USE \`${database}\``);
             await this.db.sync({
                 logging: (sql: string) => Enemene.log.debug(this.constructor.name, sql),
             });

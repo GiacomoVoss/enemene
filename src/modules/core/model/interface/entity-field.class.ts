@@ -1,10 +1,10 @@
 import {EntityFieldType} from "../enum/entity-field-type.enum";
-import {Dictionary} from "../../../../base/type/dictionary.type";
 import {serializable} from "../../../../base/type/serializable.type";
+import {Dictionary} from "../../../../base/type/dictionary.type";
 
 export class EntityField {
     constructor(public name: string,
-                public label: string,
+                public label: string | string[],
                 public type: EntityFieldType,
                 public required: boolean) {
     }

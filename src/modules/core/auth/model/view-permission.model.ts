@@ -5,9 +5,11 @@ import {Role} from "./role.model";
 import {Permission} from "../enum/permission.enum";
 import {Reference} from "../../model/decorator/reference.decorator";
 import {EntityFieldType} from "../../model/enum/entity-field-type.enum";
+import {PermissionService} from "../service/permission.service";
+import {AfterCreateHook} from "../../data";
 
 @Entity
-export class ViewPermission extends DataObject<ViewPermission> {
+export class ViewPermission extends DataObject<ViewPermission> implements AfterCreateHook {
 
     @Field("View", EntityFieldType.STRING, true)
     view: string;
@@ -22,5 +24,9 @@ export class ViewPermission extends DataObject<ViewPermission> {
 
     getPermissions(): Permission[] {
         return this.permissions.split("") as Permission[];
+    }
+
+    async onAfterCreate(): Promise<void> {
+        PermissionService.buildCache();
     }
 }

@@ -28,17 +28,7 @@ export default class AuthRouter {
             throw new UnauthorizedError();
         }
 
-        const payload: any = {
-            id: user.id,
-            username: user.username,
-            roleId: user.roleId,
-        };
-
-        for (const additionalField of user.$includeInToken) {
-            payload[additionalField] = user[additionalField];
-        }
-
-        return AuthService.sign(payload);
+        return AuthService.createToken(user);
     }
 
     @Get("public-key", true)

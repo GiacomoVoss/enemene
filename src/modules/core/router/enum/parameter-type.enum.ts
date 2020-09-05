@@ -6,4 +6,5 @@ export enum ParameterType {
     BODY = "BODY",
     CURRENT_USER = "CURRENT_USER",
     CONTEXT = "CONTEXT",
+    HEADER = "HEADER",
 }

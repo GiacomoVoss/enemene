@@ -1,11 +1,12 @@
-import {RuntimeError} from "../../interface/runtime-error.interface";
+import {RuntimeError} from "../../application/error/runtime.error";
 
-export class UnauthorizedError extends Error implements RuntimeError {
+export class UnauthorizedError extends RuntimeError {
 
     type: string = "UnauthorizedError";
     statusCode: number = 401;
 
     constructor() {
-        super(`Keine Berechtigung.`);
+        super("Unauthorized");
     }
+
 }

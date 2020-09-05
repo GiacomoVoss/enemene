@@ -2,6 +2,7 @@ import {ContextParameterMissingError, Filter} from "..";
 import {FindOptions, IncludeOptions, WhereOptions} from "sequelize/types/lib/model";
 import {Op} from "sequelize";
 import {Enemene} from "../../../..";
+import {get} from "lodash";
 
 export class FilterService {
 
@@ -48,15 +49,16 @@ export class FilterService {
 
         let result: any = value;
 
-        const matches: RegExpMatchArray | null = result.match(/{[\w\d]+}/g);
+        const matches: RegExpMatchArray | null = result.match(/{[\w\d.]+}/g);
 
         if (matches) {
             matches.forEach((match: string) => {
-                const key: string = match.replace(/{([\w\d]+)}/, "$1");
-                if (!context[key]) {
+                const key: string = match.replace(/{([\w\d.]+)}/, "$1");
+                const replacementValue: string | number = get(context, key);
+                if (!replacementValue) {
                     throw new ContextParameterMissingError(key);
                 }
-                result = result.replace(match, context[key]);
+                result = result.replace(match, replacementValue);
             });
         }
 

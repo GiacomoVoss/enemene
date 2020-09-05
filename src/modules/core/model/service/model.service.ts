@@ -8,6 +8,7 @@ import {CollectionField} from "../interface/collection-field.class";
 import {ReferenceField} from "../interface/reference-field.class";
 import {EntityFieldType} from "../enum/entity-field-type.enum";
 import {Enemene} from "../../application/enemene";
+import {EntityModel} from "../type/entity-model.type";
 
 export class ModelService {
 
@@ -17,7 +18,7 @@ export class ModelService {
         return (ModelService.FIELDS[entity] || {}) as Dictionary<EntityField, keyof T>;
     }
 
-    public static getModel(entity: string, requestedFields: string[]): Dictionary<Dictionary<EntityField> | string> {
+    public static getModel(entity: string, requestedFields: string[]): EntityModel {
         return {
             ...this.getModelInternal(entity, requestedFields),
             $root: entity,

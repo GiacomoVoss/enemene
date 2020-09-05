@@ -3,15 +3,16 @@ import {Dictionary} from "../../../../base/type/dictionary.type";
 import {Response} from "express-serve-static-core";
 import {ParameterType} from "../enum/parameter-type.enum";
 import * as express from "express";
-import {Application, NextFunction, Request} from "express";
+import {Application, NextFunction} from "express";
 import {AbstractUser} from "../../auth";
 import {authenticatedGuard} from "../../auth/guard/authenticated.guard";
 import {RequestMethod} from "../enum/request-method.enum";
-import {RuntimeError} from "../../interface/runtime-error.interface";
+import {RuntimeError} from "../../application/error/runtime.error";
 import {SecureRequest} from "../../auth/interface/secure-request.interface";
 import {PermissionService} from "../../auth/service/permission.service";
 import {Enemene} from "../../../..";
 import {InputValidationError} from "../../validation/error/input-validation.error";
+import {Redirect} from "../class/redirect.class";
 
 export class RouterService {
 
@@ -39,7 +40,12 @@ export class RouterService {
     private static async handler(req: SecureRequest, res: Response, next: Function, pathDefinition: PathDefinition): Promise<void> {
         const pathFunction: Function = pathDefinition.fn;
         const parameterValues: any[] = pathDefinition.parameters.map((param: string[]) => this.resolveParameter(req, res, param));
-        res.send(await pathFunction.apply(this, parameterValues));
+        const result: any | Redirect = await pathFunction.apply(this, parameterValues);
+        if (result instanceof Redirect) {
+            res.redirect(result.url);
+        } else {
+            res.send(result);
+        }
     }
 
     public static hasRoute(method: RequestMethod, route: string): boolean {
@@ -123,9 +129,16 @@ export class RouterService {
                 } else {
                     parameterValue = context;
                 }
+                break;
+            case ParameterType.HEADER:
+                parameterValue = req.header(value);
         }
         if (parameterValue === undefined && !optional) {
-            throw new InputValidationError(`The ${paramType} parameter "${value}" is missing.`);
+            throw new InputValidationError([{
+                type: "field",
+                field: `${paramType}.${value}`,
+                message: "required",
+            }]);
         }
 
         return parameterValue;
@@ -139,21 +152,21 @@ export class RouterService {
      * @param res   The current response.
      * @param next  Express next function. __NEEDS TO STAY__ even if not used, because express recognizes this function as error handler only if there are all 4 parameters present!
      */
-    public static async logError(err: RuntimeError, req: Request, res: Response, next: Function) {
+    public static async logError(err: RuntimeError, req: SecureRequest, res: Response, next: Function) {
 
         const statusCode = err.statusCode || 500;
 
         if ([400, 401, 403, 404].includes(statusCode)) {
-            Enemene.log.info("Access", err.message);
+            Enemene.log.info("Access", `${req.payload ? "(" + req.payload.username + ") " : ""}${err.message}`);
         } else {
-            Enemene.log.error("Access", err.message);
+            Enemene.log.error("Access", `${req.payload ? "(" + req.payload.username + ") " : ""}${err.message}`);
             Enemene.log.error("Access", err.stack);
         }
+        if (err.toJSON) {
+            return res.status(statusCode).send(err.toJSON());
+        } else {
+            return res.status(statusCode).send(new RuntimeError(err.message).toJSON());
+        }
 
-        return res.status(statusCode).send({
-            type: err.type,
-            statusCode: statusCode,
-            message: err.message,
-        });
     }
 }

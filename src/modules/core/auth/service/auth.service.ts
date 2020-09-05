@@ -7,10 +7,13 @@ export class AuthService {
 
     public static PRIVATE_KEY: string;
     public static PUBLIC_KEY: string;
+    public static INCLUDE_IN_TOKEN: string[] = [];
 
-    public static init(publicKeyPath: string, privateKeyPath: string): void {
+    public static init(userModel: typeof AbstractUser, publicKeyPath: string, privateKeyPath: string): void {
         this.PUBLIC_KEY = fs.readFileSync(publicKeyPath, "utf8");
         this.PRIVATE_KEY = fs.readFileSync(privateKeyPath, "utf8");
+        const dummyUser = userModel.build();
+        this.INCLUDE_IN_TOKEN = dummyUser.$includeInToken;
     }
 
     public static async authenticate(auth: string): Promise<AbstractUser | undefined> {
@@ -28,10 +31,21 @@ export class AuthService {
         }
     }
 
-    public static sign(payload): string {
+    public static createToken(user: AbstractUser): string {
         if (!AuthService.PUBLIC_KEY) {
             return undefined;
         }
+
+        const payload: any = {
+            id: user.id,
+            username: user.username,
+            roleId: user.roleId,
+        };
+
+        for (const additionalField of this.INCLUDE_IN_TOKEN) {
+            payload[additionalField] = user[additionalField];
+        }
+
         return jwt.sign(payload, AuthService.PRIVATE_KEY, {
             algorithm: "RS256",
         });

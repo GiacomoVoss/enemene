@@ -4,7 +4,7 @@ import {EntityField} from "../interface/entity-field.class";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {CollectionField} from "../interface/collection-field.class";
 
-export function Collection(label: string,
+export function Collection(label: string | string[],
                            classGetter: () => any,
                            foreignKey: string,
                            onUpdate: "SET NULL" | "CASCADE" = "CASCADE",

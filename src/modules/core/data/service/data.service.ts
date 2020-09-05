@@ -1,7 +1,6 @@
 import {ObjectNotFoundError} from "../../error/object-not-found.error";
 import {DataObject} from "../../model/data-object.model";
 import {ValidationService} from "../../validation/service/validation.service";
-import {SchemaMap} from "@hapi/joi";
 import {UnauthorizedError} from "../../auth/error/unauthorized.error";
 import {CountOptions, FindOptions} from "sequelize";
 import {UuidService} from "../../service/uuid.service";
@@ -18,6 +17,8 @@ import {Enemene} from "../../application/enemene";
 import {OrderItem} from "sequelize/types/lib/model";
 import {uuid} from "../../../../base/type/uuid.type";
 import {AfterCreateHook, BeforeCreateHook} from "..";
+import {Validate} from "../../validation/class/validate.class";
+import {RuntimeError} from "../../application/error/runtime.error";
 
 /**
  * Service to retrieve data from the model.
@@ -65,6 +66,17 @@ export class DataService {
         return object;
     }
 
+    public static async find<ENTITY extends DataObject<ENTITY>>(clazz: any, options?: FindOptions): Promise<ENTITY> {
+        const object: ENTITY = await clazz.findOne({
+            ...options,
+        });
+        if (!object) {
+            return null;
+        }
+        object.$entity = clazz.name;
+        return object;
+    }
+
 
     public static async findNotNullById<ENTITY extends DataObject<ENTITY>>(clazz: any, id: number | string, options?: FindOptions): Promise<ENTITY> {
         const object: ENTITY = await clazz.findByPk(id, {
@@ -95,14 +107,14 @@ export class DataService {
      * @param clazz
      * @param object            - The object to update.
      * @param data              - The data to populate the object with.
-     * @param validationSchema  - (optional) Validation schema.
+     * @param validation  - (optional) Validation schema.
      */
-    public static async update<T extends DataObject<T>>(clazz: any, object: DataObject<T>, data: any, validationSchema?: SchemaMap): Promise<void> {
+    public static async update<T extends DataObject<T>>(clazz: any, object: DataObject<T>, data: any, validation?: Validate): Promise<void> {
         await Enemene.app.db.transaction(async t => {
             data.$entity = clazz.name;
             object = await DataService.populate(data, object);
 
-            ValidationService.validate(clazz, object);
+            ValidationService.validate(object, validation);
 
             await object.save({transaction: t});
         });
@@ -113,17 +125,17 @@ export class DataService {
      *
      * @param clazz             - The class the object should be of.
      * @param data              - The data to populate the object with.
-     * @param [validationSchema]- Validation schema.
-     * @param [options]          - Filter that the created object has to meet.
+     * @param [validation]      - Validation schema.
+     * @param [options]         - Filter that the created object has to meet.
      */
-    public static async create<T extends DataObject<T>>(clazz: any, data: Dictionary<serializable>, validationSchema?: SchemaMap, options: FindOptions = {}): Promise<T> {
+    public static async create<T extends DataObject<T>>(clazz: any, data: Dictionary<serializable>, validation?: Validate, options: FindOptions = {}): Promise<T> {
         let object: T = null;
 
         await Enemene.app.db.transaction(async t => {
             data.$entity = clazz.name;
             object = await DataService.populate(data);
 
-            ValidationService.validate(clazz, object as DataObject<T>);
+            ValidationService.validate(object as DataObject<T>, validation);
 
             if ((object as unknown as BeforeCreateHook).onBeforeCreate) {
                 await (object as unknown as BeforeCreateHook).onBeforeCreate();
@@ -159,36 +171,38 @@ export class DataService {
      *
      * @param clazz             - The class the object should be of.
      * @param data              - The data to populate the objects with.
-     * @param [validationSchema]- Validation schema.
+     * @param [validation]      - Validation schema.
      * @param [filter]          - Filter that the created object has to meet.
      */
-    public static async bulkCreate<T extends DataObject<T>>(clazz: any, data: Dictionary<serializable>[], validationSchema?: SchemaMap, filter?: any): Promise<T[]> {
+    public static async bulkCreate<T extends DataObject<T>>(clazz: any, data: Dictionary<serializable>[], validation?: Validate, filter?: any): Promise<T[]> {
         let objects: T[] = [];
         await Enemene.app.db.transaction(async t => {
             let dataObjects: Dictionary<serializable>[] = [];
             for (const dataObject of data) {
                 dataObject.id = UuidService.getUuid();
                 dataObject.$entity = clazz.name;
+                const object: T = await DataService.populate(dataObject);
+                ValidationService.validate(object, validation);
                 dataObjects.push(dataObject);
             }
 
             objects = await clazz.bulkCreate(dataObjects, {transaction: t});
 
-            // if (filter) {
-            //     const where = {};
-            //     clazz.primaryKeyAttributes.forEach(attribute => where[attribute] = object[attribute]);
-            //     const found = await clazz.count({
-            //         where: {
-            //             ...where,
-            //             ...filter
-            //         },
-            //         transaction: t
-            //     });
-            //
-            //     if (found != 1) {
-            //         throw new UnauthorizedError();
-            //     }
-            // }
+            if (filter) {
+                const where = {};
+                clazz.primaryKeyAttributes.forEach(attribute => where[attribute] = objects[0][attribute]);
+                const found = await clazz.count({
+                    where: {
+                        ...where,
+                        ...filter
+                    },
+                    transaction: t
+                });
+
+                if (found != 1) {
+                    throw new UnauthorizedError();
+                }
+            }
         });
         return objects;
     }
@@ -226,7 +240,7 @@ export class DataService {
         return findOptions;
     }
 
-    public static async populate<T extends DataObject<T>>(data: Dictionary<any>, originalData?: T): Promise<T> {
+    public static async populate<T extends DataObject<T>>(data: Dictionary<any>, originalData?: T, t?: any): Promise<T> {
         let object: T;
         if (originalData) {
             object = originalData;
@@ -239,25 +253,30 @@ export class DataService {
         }
         const fields: Dictionary<EntityField, keyof T> = ModelService.getFields(data.$entity);
         for (const [key, field] of Object.entries(fields)) {
-            if (data[key]) {
-                if (field instanceof CompositionField) {
-                    const subObjectData: Dictionary<any> = data[key];
+            if (field instanceof CompositionField) {
+                const subObjectData: Dictionary<any> = data[key] ?? data[field.foreignKey];
+                if (subObjectData) {
                     if (subObjectData.id) {
-                        const subObject = await DataService.findNotNullById(field.classGetter(), subObjectData.id);
+                        const subObject: DataObject<any> = await DataService.findNotNullById(field.classGetter(), subObjectData.id);
                         await DataService.update(field.classGetter(), subObject, subObjectData);
+                        object[field.foreignKey] = subObjectData.id;
                     } else {
                         const subObject = await DataService.create(field.classGetter(), subObjectData);
                         object.$set(key as keyof T, subObject);
+                        object[field.foreignKey] = subObject.id;
                     }
-                } else if (field instanceof ReferenceField) {
-                    const subObjectId: uuid = data[key] ?? data[field.foreignKey];
+                }
+            } else if (field instanceof ReferenceField) {
+                const subObjectId: uuid = data[key] ?? data[field.foreignKey];
+                if (subObjectId) {
                     const referenceObject = await DataService.findNotNullById(field.classGetter(), subObjectId);
                     object[field.foreignKey as keyof T] = referenceObject.id as any;
-                } else if (field instanceof CollectionField) {
-                    throw new Error("Cannot save collections directly.");
-                } else {
-                    object[key as keyof T] = data[key];
+                    object[key as keyof T] = referenceObject as any;
                 }
+            } else if (field instanceof CollectionField && data[key]) {
+                throw new RuntimeError("Cannot save collections directly.");
+            } else if (data[key] !== undefined) {
+                object[key as keyof T] = data[key];
             }
         }
 

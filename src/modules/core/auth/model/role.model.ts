@@ -1,9 +1,11 @@
 import {Collection, DataObject, Entity, EntityFieldType, Field} from "../../model";
 import {RoutePermission} from "./route-permission.model";
 import {ViewPermission} from "./view-permission.model";
+import {PermissionService} from "../service/permission.service";
+import {AfterCreateHook} from "../../data";
 
 @Entity
-export class Role extends DataObject<Role> {
+export class Role extends DataObject<Role> implements AfterCreateHook {
 
     $displayPattern = "{name}";
 
@@ -15,4 +17,9 @@ export class Role extends DataObject<Role> {
 
     @Collection("View-Berechtigungen", () => ViewPermission, "roleId")
     viewPermissions: ViewPermission[];
+
+
+    async onAfterCreate(): Promise<void> {
+        PermissionService.buildCache();
+    }
 }

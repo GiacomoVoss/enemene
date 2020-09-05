@@ -21,7 +21,7 @@ import {AbstractAction} from "../action/class/abstract-action.class";
 import {ActionService} from "../action/service/action.service";
 import ActionRouter from "../action/action.router";
 import {AuthService} from "../auth/service/auth.service";
-import https, {Server} from "https";
+import https from "https";
 import * as fs from "fs";
 import ViewPutRouter from "../view/view-put.router";
 import {Role, RoutePermission, ViewPermission} from "../auth";
@@ -36,14 +36,10 @@ export class Enemene {
     public static app: Enemene;
 
     public static log: LogService;
-
-    private services: Dictionary<any> = {};
-
     public express: express.Application;
-
     public db: Sequelize;
-
     public devMode: boolean;
+    private services: Dictionary<any> = {};
 
     constructor(public config: EnemeneConfig) {
         this.express = express();
@@ -51,10 +47,6 @@ export class Enemene {
         this.express.use(allowHeaders);
         this.express.use(bodyParser.json());
         Enemene.log[config.logLevel.toLowerCase()]("Server", "Log level: " + config.logLevel.toUpperCase());
-        if (this.config.security) {
-            AuthService.init(this.config.security.jwtPublicKeyPath, this.config.security.jwtPrivateKeyPath);
-        }
-
         this.config.port = `${this.normalizePort(config.port)}`;
 
         this.db = new Sequelize({
@@ -83,6 +75,11 @@ export class Enemene {
             },
             logging: sql => Enemene.log.debug("Database", sql),
         });
+
+        if (this.config.security) {
+            AuthService.init(this.config.userModel, this.config.security.jwtPublicKeyPath, this.config.security.jwtPrivateKeyPath);
+        }
+
     }
 
     public static async create(config: EnemeneConfig): Promise<Enemene> {
@@ -101,7 +98,6 @@ export class Enemene {
      */
     public async importDatabase(fixturesPath: string): Promise<void> {
         await new DbImport(this.db, fixturesPath).resetAndImportDb();
-        process.exit(0);
     }
 
     public async setup(routers: Dictionary<Function>,
@@ -126,6 +122,33 @@ export class Enemene {
             await this.setupServices(services);
         }
         await PermissionService.buildCache();
+    }
+
+    public start(): void {
+        if (this.config.ssl) {
+            this.express.use((req: Request, res: Response, next: NextFunction) => {
+                if (req.secure) {
+                    // request was via https, so do no special handling
+                    next();
+                } else {
+                    // request was via http, so redirect to https
+                    res.redirect("https://" + req.headers.host + req.url);
+                }
+            });
+            https.createServer({
+                    key: fs.readFileSync(this.config.ssl.sslKeyPath),
+                    cert: fs.readFileSync(this.config.ssl.sslCertPath),
+                    passphrase: this.config.ssl.sslPassphrase,
+                },
+                this.express
+            ).listen(this.config.port, () => {
+                Enemene.log.info("Server", "Listening on port: " + this.config.port);
+            });
+        } else {
+            this.express.listen(this.config.port, () => {
+                Enemene.log.info("Server", "Listening on port: " + this.config.port);
+            });
+        }
     }
 
     private async setupRouters(routers: Dictionary<Function>): Promise<void> {
@@ -176,33 +199,6 @@ export class Enemene {
                     await instance.onStart();
                 }
             }
-        }
-    }
-
-    public start(): void {
-        if (this.config.ssl) {
-            this.express.use((req: Request, res: Response, next: NextFunction) => {
-                if (req.secure) {
-                    // request was via https, so do no special handling
-                    next();
-                } else {
-                    // request was via http, so redirect to https
-                    res.redirect("https://" + req.headers.host + req.url);
-                }
-            });
-            https.createServer({
-                    key: fs.readFileSync(this.config.ssl.sslKeyPath),
-                    cert: fs.readFileSync(this.config.ssl.sslCertPath),
-                    passphrase: this.config.ssl.sslPassphrase,
-                },
-                this.express
-            ).listen(this.config.port, () => {
-                Enemene.log.info("Server", "Listening on port: " + this.config.port);
-            });
-        } else {
-            this.express.listen(this.config.port, () => {
-                Enemene.log.info("Server", "Listening on port: " + this.config.port);
-            });
         }
     }
 

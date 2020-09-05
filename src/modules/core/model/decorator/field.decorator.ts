@@ -5,8 +5,10 @@ import {ModelService} from "../service/model.service";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {EntityField} from "../interface/entity-field.class";
 import {EntityFieldType} from "../enum/entity-field-type.enum";
+import * as bcrypt from "bcrypt";
+import {genSaltSync} from "bcrypt";
 
-export function Field(label: string, type: EntityFieldType = EntityFieldType.STRING, required: boolean = false, options: Partial<ModelAttributeColumnOptions> = {}): Function {
+export function Field(label: string | string[], type: EntityFieldType = EntityFieldType.STRING, required: boolean = false, options: Partial<ModelAttributeColumnOptions> = {}): Function {
     return function (target, propertyKey, descriptor): void {
         const fields: Dictionary<EntityField> = ModelService.FIELDS[target.constructor.name] || {};
         fields[propertyKey] = new EntityField(propertyKey, label, type, required);
@@ -22,6 +24,11 @@ export function Field(label: string, type: EntityFieldType = EntityFieldType.STR
             };
         } else if (type === EntityFieldType.TEXT) {
             options.type = DataTypes.TEXT;
+        } else if (type === EntityFieldType.PASSWORD) {
+            options.type = DataTypes.STRING;
+            options.set = function (this: Model, value: string) {
+                this.setDataValue(propertyKey, bcrypt.hashSync(value, genSaltSync()));
+            };
         } else if (Array.isArray(type)) {
             options.type = DataTypes.ENUM;
             options.values = type;

@@ -1,5 +1,6 @@
 export namespace EntityFieldType {
     export const STRING = "STRING";
+    export const PASSWORD = "PASSWORD";
     export const TEXT = "TEXT";
     export const UUID = "UUID";
     export const EMAIL = "EMAIL";

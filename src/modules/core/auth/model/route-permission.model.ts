@@ -5,9 +5,11 @@ import {Role} from "./role.model";
 import {RequestMethod} from "../../router/enum/request-method.enum";
 import {Reference} from "../../model/decorator/reference.decorator";
 import {EntityFieldType} from "../../model/enum/entity-field-type.enum";
+import {AfterCreateHook} from "../../data";
+import {PermissionService} from "../service/permission.service";
 
 @Entity
-export class RoutePermission extends DataObject<RoutePermission> {
+export class RoutePermission extends DataObject<RoutePermission> implements AfterCreateHook {
 
     @Field("Route", EntityFieldType.STRING, true)
     route: string;
@@ -19,4 +21,8 @@ export class RoutePermission extends DataObject<RoutePermission> {
     role: Role;
 
     roleId: string;
+    
+    async onAfterCreate(): Promise<void> {
+        PermissionService.buildCache();
+    }
 }

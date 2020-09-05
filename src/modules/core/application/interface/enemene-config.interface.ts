@@ -65,6 +65,8 @@ export interface EnemeneConfig {
 
     userModel: typeof AbstractUser;
 
+    languages?: string[];
+
     /**
      * This can contain 2 possible values:
      * 1. a url starting with http/https to a running server, which will be proxied through the enemene server.

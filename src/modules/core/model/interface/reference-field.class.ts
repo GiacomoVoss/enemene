@@ -3,7 +3,7 @@ import {EntityFieldType} from "../enum/entity-field-type.enum";
 
 export class ReferenceField extends EntityField {
     constructor(public name: string,
-                public label: string,
+                public label: string | string[],
                 public classGetter: () => any,
                 public foreignKey: string,
                 public required: boolean) {

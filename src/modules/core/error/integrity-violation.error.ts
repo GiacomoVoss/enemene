@@ -1,12 +1,12 @@
-import {RuntimeError} from "../interface/runtime-error.interface";
+import {RuntimeError} from "../application/error/runtime.error";
 
-export class IntegrityViolationError extends Error implements RuntimeError {
+export class IntegrityViolationError extends RuntimeError {
 
     statusCode: number = 423;
     type: string = "IntegrityViolationError";
 
     constructor() {
-        super("Diese Aktion kann zur Wahrung von Integrität (Referenzen, bereits vorliegende Daten, ...) nicht ausgeführt werden.");
+        super("");
     }
 }
 

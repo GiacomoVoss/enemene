@@ -1,3 +1,4 @@
+export * from "./class/redirect.class";
 export * from "./decorator/get.decorator";
 export * from "./decorator/delete.decorator";
 export * from "./decorator/post.decorator";

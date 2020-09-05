@@ -1,18 +1,22 @@
 import {View, ViewFieldDefinition} from "..";
 import {ObjectNotFoundError} from "../../error/object-not-found.error";
-import {FindOptions} from "sequelize";
+import {FindOptions, IncludeOptions} from "sequelize";
 import {FilterService} from "../../filter/service/filter.service";
 import {EntityField} from "../../model/interface/entity-field.class";
 import {ModelService} from "../../model/service/model.service";
-import {intersection, merge, omit} from "lodash";
+import {intersection, omit, pick} from "lodash";
 import {CollectionField} from "../../model/interface/collection-field.class";
 import {ManyToManyField} from "../../model/interface/many-to-many-field.class";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {AbstractUser} from "../../auth";
 import chalk from "chalk";
-import {DataObject, DataResponse, DataService, Enemene} from "../../../..";
+import {DataObject, DataResponse, DataService, Enemene, EntityFieldType} from "../../../..";
 import {ActionConfiguration} from "../../action/interface/action-configuration.interface";
 import {serializable} from "../../../../base/type/serializable.type";
+import {EntityModel} from "../../model/type/entity-model.type";
+import {I18nService} from "../../i18n/service/i18n.service";
+import {AuthService} from "../../auth/service/auth.service";
+import {ReferenceField} from "../../model/interface/reference-field.class";
 
 /**
  * Service for handling views for data manipulation.
@@ -47,11 +51,12 @@ export class ViewService {
         }
     }
 
-    public static async findAllByView<ENTITY extends DataObject<ENTITY>>(view: View<any>, requestedFields: string, user: AbstractUser, context: Dictionary<serializable> = {}, find?: FindOptions): Promise<DataResponse<ENTITY>> {
+    public static async findAllByView<ENTITY extends DataObject<ENTITY>>(view: View<any>, requestedFields: string, user: AbstractUser, context: Dictionary<serializable> = {}, additionalFindOptions: FindOptions, language?: string): Promise<DataResponse<ENTITY>> {
         let fields: string[] = ViewService.getFields(view, requestedFields);
 
-        const data: DataObject<ENTITY>[] = await DataService.findAll(view.entity(), ViewService.getFindOptions(view, user, context, find));
-        const model = ViewService.getModelForView(view);
+        const findOptions: FindOptions = ViewService.getFindOptions(view, user, context, additionalFindOptions);
+        const data: DataObject<ENTITY>[] = await DataService.findAll(view.entity(), findOptions);
+        const model = ViewService.getModelForView(view, language);
         return {
             data: await Promise.all(data.map((object: DataObject<ENTITY>) => DataService.filterFields(object, fields))) as Partial<ENTITY>[],
             model,
@@ -59,14 +64,32 @@ export class ViewService {
         };
     }
 
-    public static async findByIdByView<ENTITY extends DataObject<ENTITY>>(view: View<any>, id: string, requestedFields: string, user: AbstractUser, context: Dictionary<serializable> = {}): Promise<DataResponse<ENTITY>> {
+    public static async findByIdByView<ENTITY extends DataObject<ENTITY>>(view: View<any>, id: string, requestedFields: string, user: AbstractUser, context: Dictionary<serializable> = {}, additionalFindOptions?: FindOptions, language?: string): Promise<DataResponse<ENTITY>> {
         let fields: string[] = ViewService.getFields(view, requestedFields);
 
-        const data: DataObject<ENTITY> = await DataService.findNotNullById(view.entity(), id, ViewService.getFindOptions(view, user, context));
-        const model = ViewService.getModelForView(view);
+        const model: EntityModel = ModelService.getModel(view.entity().name, fields);
+
+        const include: IncludeOptions[] = Object.values(model[view.entity().name]).map((field: EntityField) => {
+            if (!fields.includes(field.name)) {
+                return undefined;
+            }
+            if ([EntityFieldType.REFERENCE, EntityFieldType.COLLECTION, EntityFieldType.COMPOSITION].includes(field.type as string)) {
+                return {
+                    model: (field as ReferenceField).classGetter(),
+                    as: field.name,
+                };
+            }
+            return undefined;
+        }).filter((includeOption: IncludeOptions | undefined) => !!includeOption);
+
+        const findOptions: FindOptions = ViewService.getFindOptions(view, user, context, {
+            ...additionalFindOptions,
+            include,
+        });
+        const data: DataObject<ENTITY> = await DataService.findNotNullById(view.entity(), id, ViewService.getFindOptions(view, user, context, findOptions));
         return {
             data: await DataService.filterFields(data, fields) as Partial<ENTITY>,
-            model,
+            model: ViewService.getModelForView(view, language),
             actions: ViewService.getViewActions(view),
         };
     }
@@ -105,7 +128,7 @@ export class ViewService {
         return view;
     }
 
-    public static getFields(view: View<any>, requestedFieldsString?: string): string[] {
+    public static getFields(view: View<any>, requestedFieldsString: string = "*"): string[] {
         let fields: string[] = [];
         let fieldName: string;
         for (const viewField of view.fields) {
@@ -119,12 +142,12 @@ export class ViewService {
                 fields.push(...this.getFields(viewFieldDefinition.view).map(field => `${String(viewFieldDefinition.field)}.${field}`));
             }
             const entityField: EntityField = ModelService.getFields(view.entity().name)[fieldName];
-            if (entityField instanceof CollectionField || entityField instanceof ManyToManyField) {
+            if (requestedFieldsString !== "*" && (entityField instanceof CollectionField || entityField instanceof ManyToManyField)) {
                 fields.push(`${fieldName}.$count`);
             }
         }
 
-        if (requestedFieldsString && requestedFieldsString !== "*") {
+        if (requestedFieldsString !== "*") {
             fields = intersection(fields, requestedFieldsString.split(","));
         }
 
@@ -138,6 +161,7 @@ export class ViewService {
         if (user) {
             context.currentUserId = user.id;
             context.currentUserRoleId = user.roleId;
+            context.user = pick(user, AuthService.INCLUDE_IN_TOKEN);
         }
 
         let find: FindOptions = {};
@@ -147,24 +171,26 @@ export class ViewService {
 
         find.order = additionalFindOptions.order ?? view.defaultOrder;
         find.limit = additionalFindOptions.limit;
+        find.offset = additionalFindOptions.offset;
+        find.include = additionalFindOptions.include;
+
+        console.log(find);
 
         return find;
     }
 
-    public static getModelForView(view: View<any>): Dictionary<Dictionary<EntityField> | string> {
-        const model = ModelService.getModel(view.entity().name, ViewService.getFields(view));
+    public static getModelForView(view: View<any>, language?: string): Dictionary<serializable> {
+        let model: EntityModel = ModelService.getModel(view.entity().name, ViewService.getFields(view));
         view.fields.forEach(field => {
             if (typeof field !== "string") {
                 const viewFieldDefinition: ViewFieldDefinition<any, any> = field as ViewFieldDefinition<any, any>;
-                merge(model, omit(ModelService.getModel(viewFieldDefinition.view.entity().name, ViewService.getFields(viewFieldDefinition.view)), "$root"));
-                if (viewFieldDefinition.allowedValuesView) {
-                    model[view.entity().name][viewFieldDefinition.field] = {
-                        ...model[view.entity().name][viewFieldDefinition.field],
-                    };
-                }
+                model = {
+                    ...model,
+                    ...omit(ModelService.getModel(viewFieldDefinition.view.entity().name, ViewService.getFields(viewFieldDefinition.view)), "$root")
+                };
             }
         });
 
-        return model;
+        return I18nService.parseEntityModel(model, language);
     }
 }

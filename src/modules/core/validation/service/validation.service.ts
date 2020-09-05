@@ -1,70 +1,99 @@
 import {DataObject} from "../../model/data-object.model";
-import {DateService} from "../../service/date.service";
-import {ModelService} from "../../model/service/model.service";
-import {EntityField} from "../../model/interface/entity-field.class";
-import {isEmpty} from "lodash";
-import * as Joi from "@hapi/joi";
-import {SchemaMap, ValidationErrorItem, ValidationOptions} from "@hapi/joi";
+import {Validate} from "../class/validate.class";
+import {ValidationResult} from "../type/validation-result.type";
+import {ValidationError} from "../interface/validation-error.interface";
+import {get} from "lodash";
 import {InputValidationError} from "../error/input-validation.error";
+import {ModelService} from "../../model/service/model.service";
+import {Dictionary} from "../../../../base/type/dictionary.type";
+import {EntityField} from "../../model/interface/entity-field.class";
+import {ValidationFieldError} from "../interface/validation-field-error.interface";
+import {ValidationNotError} from "../interface/validation-not-error.interface";
+import {ValidationOrError} from "../interface/validation-or-error.interface";
+import {I18nService} from "../../i18n/service/i18n.service";
 
-export const ValidationService = {
-    validate,
-    parseValidationMessages,
-};
+export class ValidationService {
 
-const validationOptions: ValidationOptions = {
-    abortEarly: false,
-    allowUnknown: true
-};
+    public static validate<ENTITY extends DataObject<ENTITY>>(object: DataObject<ENTITY>, validation?: Validate, language?: string): void {
+        const fields: Dictionary<EntityField, keyof ENTITY> = ModelService.getFields(object.$entity);
+        const requiredFields: string[] = Object.values(fields)
+            .filter((field: EntityField) => field.required)
+            .map((field: EntityField) => field.name);
 
-function validate<ENTITY extends DataObject<ENTITY>>(clazz: ENTITY, object: DataObject<ENTITY>): void {
-    const dataToValidate = {};
+        const compositeValidations: Validate[] = [];
 
-    let validationSchema: SchemaMap = {};
-    let fields: EntityField[] = Object.values(ModelService.FIELDS[(clazz as any).name]);
+        if (validation) {
+            compositeValidations.push(validation);
+        }
 
-    for (const field of fields) {
-        if (field.required && !object[field.name]) {
-            validationSchema[field.name] = Joi.required();
+        if (requiredFields.length) {
+            compositeValidations.push(...requiredFields.map(Validate.exists));
+        }
+
+        let result;
+
+        if (compositeValidations.length) {
+            result = this.validateInternal(object, Validate.and(...compositeValidations), language);
+        } else {
+            result = true;
+        }
+
+        if (result !== true) {
+            throw new InputValidationError(result);
         }
     }
 
-    if (!isEmpty(validationSchema)) {
-        try {
-            Joi.assert(dataToValidate, Joi.compile(validationSchema), validationOptions);
-        } catch (e) {
-            throw new InputValidationError(ValidationService.parseValidationMessages(e.details, fields));
+    private static validateInternal<ENTITY extends DataObject<ENTITY>>(object: DataObject<ENTITY>, validation: Validate, language?: string): ValidationResult {
+        const model: Dictionary<EntityField> = ModelService.getFields(object.$entity);
+        const errors: ValidationError[] = [];
+        if (validation.name === "and") {
+            (validation.args.map((arg: Validate) => this.validateInternal(object, arg, language))
+                .filter((result: ValidationResult) => result !== true) as ValidationError[])
+                .forEach((errorResults: ValidationError[]) => {
+                    errors.push(...errorResults);
+                });
+        } else if (validation.name === "or") {
+            const orResults: ValidationResult[] = [];
+            let fulfilled = false;
+            for (const arg of validation.args) {
+                const result: ValidationResult = this.validateInternal(object, arg, language);
+                if (result === true) {
+                    fulfilled = true;
+                    break;
+                } else {
+                    orResults.push(result);
+                }
+            }
+            if (!fulfilled) {
+                errors.push({
+                    type: "or",
+                    validationErrors: orResults,
+                } as ValidationOrError);
+            }
+        } else if (validation.name === "not") {
+            const result: ValidationResult = this.validateInternal(object, validation.args[0], language);
+            if (result === true) {
+                errors.push({
+                    type: "not",
+                    validationError: result,
+                } as ValidationNotError);
+            }
+        } else if (validation.name === "exists") {
+            const value = get(object, validation.parameters[0]);
+            if (value === undefined || value === null || (typeof value === "string" && value.length === 0)) {
+                errors.push({
+                    type: "field",
+                    field: validation.parameters[0],
+                    message: "required",
+                    label: I18nService.getI18nizedString(model[validation.parameters[0]].label, language),
+                } as ValidationFieldError);
+            }
         }
-    }
-}
 
-function parseValidationMessages(messages: ValidationErrorItem[], fields: EntityField[]): string {
-    return messages
-        .map((errorItem: ValidationErrorItem) => {
-            const field = fields.find((field: EntityField) => field.name === errorItem.context.key);
-            return field.name + "::" + formatValidationMessage(errorItem, fields);
-        })
-        .join("\n");
-}
-
-function formatValidationMessage(errorItem: ValidationErrorItem, fields: EntityField[]): string {
-    const field = fields.find((field: EntityField) => field.name === errorItem.context.key);
-    const attribute: string = field ? field.label : errorItem.context.key;
-    switch (errorItem.type) {
-        case "any.empty":
-        case "any.required":
-            return `"${attribute}" darf nicht leer sein.`;
-
-        case "date.min":
-            const dateLimit: Date = new Date(errorItem.context.limit);
-            return `"${attribute}" muss größer oder gleich ${DateService.formatDateTime(dateLimit)} sein.`;
-
-        case "number.base":
-            return `"${attribute}" muss eine Zahl sein."`;
-
-        case "any.only":
-            return `"${attribute}" muss gleich ${errorItem.context.valids.map((v: string) => `"${v}"`).join(" | ")} sein.`;
-        default:
-            return errorItem.message + "(" + errorItem.type + ")";
+        if (!errors.length) {
+            return true;
+        } else {
+            return errors;
+        }
     }
 }

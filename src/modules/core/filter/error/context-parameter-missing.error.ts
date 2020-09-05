@@ -1,11 +1,18 @@
-import {RuntimeError} from "../../interface/runtime-error.interface";
+import {RuntimeError} from "../../application/error/runtime.error";
 
-export class ContextParameterMissingError extends Error implements RuntimeError {
+export class ContextParameterMissingError extends RuntimeError {
 
     statusCode: number = 400;
     type: string = "ContextParameterMissingError";
 
-    constructor(param: string) {
-        super(`Kontextparameter "${param}" fehlt.`);
+    constructor(private param: string) {
+        super(`Context parameter "${param}" missing in request`);
+    }
+
+    toJSON(): object {
+        return {
+            ...super.toJSON(),
+            param: this.param,
+        };
     }
 }

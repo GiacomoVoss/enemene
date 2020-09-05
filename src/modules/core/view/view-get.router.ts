@@ -7,13 +7,13 @@ import {RequestMethod} from "../router/enum/request-method.enum";
 import {View, ViewFieldDefinition} from "./";
 import {UnauthorizedError} from "../auth/error/unauthorized.error";
 import {Dictionary} from "../../../base/type/dictionary.type";
-import {EntityField} from "../model/interface/entity-field.class";
 import {uuid} from "../../../base/type/uuid.type";
 import {serializable} from "../../../base/type/serializable.type";
 import {PermissionService} from "../auth/service/permission.service";
 import {intersection} from "lodash";
-import {FindOptions} from "sequelize";
 import {ObjectNotFoundError} from "../error/object-not-found.error";
+import {Header, HttpHeader} from "../router/decorator/parameter/header.decorator";
+import {Enemene} from "../../..";
 
 @RouterModule("view")
 export default class ViewGetRouter {
@@ -21,11 +21,13 @@ export default class ViewGetRouter {
     @Get("/count/:view", true)
     async countObjects<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
                                                           @Path("view") viewName: string,
-                                                          @Context() context: Dictionary<serializable>): Promise<{ data: number }> {
+                                                          @Context() context: Dictionary<serializable>): Promise<object> {
         PermissionService.checkViewPermission(viewName, RequestMethod.GET, user);
         const view: View<ENTITY> = ViewService.getViewNotNull(viewName);
         return {
-            data: await DataService.count(view.entity(), ViewService.getFindOptions(view, user, context)),
+            data: {
+                count: await DataService.count(view.entity(), ViewService.getFindOptions(view, user, context))
+            },
         };
     }
 
@@ -36,11 +38,11 @@ export default class ViewGetRouter {
                                                         @Query("order") order: string,
                                                         @Query("limit") limit: string,
                                                         @Query("offset") offset: string,
-                                                        @Context() context: Dictionary<serializable>): Promise<DataResponse<ENTITY>> {
+                                                        @Context() context: Dictionary<serializable>,
+                                                        @Header(HttpHeader.LANGUAGE) language: string): Promise<DataResponse<ENTITY>> {
         PermissionService.checkViewPermission(viewName, RequestMethod.GET, user);
         const view: View<ENTITY> = ViewService.getViewNotNull(viewName);
-        const findOptions: FindOptions = ViewService.getFindOptions(view, user, context, DataService.getFindOptions(order, limit, offset));
-        return ViewService.findAllByView(view, requestedFields, user, context, findOptions);
+        return ViewService.findAllByView(view, requestedFields, user, context, DataService.getFindOptions(order, limit, offset), language);
     }
 
     @Get("/:view/:id", true)
@@ -69,9 +71,14 @@ export default class ViewGetRouter {
         }
 
         const fields: string[] = ViewService.getFields(baseView);
-
-        const data: DataObject<ENTITY> = await DataService.findNotNullById(baseView.entity(), objectId, ViewService.getFindOptions(baseView, user, context));
         const model = ViewService.getModelForView(baseView);
+
+        const data: DataObject<ENTITY> = await DataService.findNotNullById(baseView.entity(), objectId, ViewService.getFindOptions(baseView, user, context, {
+            include: [{
+                model: Enemene.app.db.model(model[baseView.entity().name][collectionField as string]),
+                as: collectionField as string,
+            }]
+        }));
 
         let subFields: string[] = fields.filter(field => field.startsWith(`${String(collectionField)}.`));
         if (requestedFields) {
@@ -127,7 +134,7 @@ export default class ViewGetRouter {
 
     @Get("/model/:view", true)
     async getViewModel(@CurrentUser user: AbstractUser,
-                       @Path("view") viewName: string): Promise<Dictionary<Dictionary<EntityField> | string>> {
+                       @Path("view") viewName: string): Promise<Dictionary<serializable>> {
         PermissionService.checkViewPermission(viewName, RequestMethod.GET, user);
         const view: View<any> = ViewService.getViewNotNull(viewName);
 
