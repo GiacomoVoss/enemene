@@ -3,7 +3,7 @@ import {ActionConfiguration} from "../../action/interface/action-configuration.i
 import {serializable} from "../../../../base/type/serializable.type";
 
 export interface DataResponse<ENTITY> {
-    data: Partial<ENTITY> | Partial<ENTITY>[];
+    data: Dictionary<any, keyof ENTITY> | Dictionary<any, keyof ENTITY>[];
 
     model: Dictionary<serializable>;
 

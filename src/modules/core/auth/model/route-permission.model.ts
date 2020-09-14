@@ -21,7 +21,7 @@ export class RoutePermission extends DataObject<RoutePermission> implements Afte
     role: Role;
 
     roleId: string;
-    
+
     async onAfterCreate(): Promise<void> {
         PermissionService.buildCache();
     }

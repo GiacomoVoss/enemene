@@ -8,6 +8,7 @@ export class ReferenceField extends EntityField {
                 public foreignKey: string,
                 public required: boolean) {
         super(name, label, EntityFieldType.REFERENCE, required);
+        this.isSimpleField = false;
     }
 
     public toJSON(): any {

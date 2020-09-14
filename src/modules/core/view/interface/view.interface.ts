@@ -33,5 +33,7 @@ export interface View<ENTITY extends DataObject<ENTITY>> {
      */
     defaultOrder?: Order;
 
+    searchAttributes?: string[];
+
     actions?: (typeof AbstractAction)[];
 }

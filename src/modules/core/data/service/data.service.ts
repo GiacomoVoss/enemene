@@ -40,7 +40,7 @@ export class DataService {
         });
     }
 
-    public static async findAll<T extends DataObject<T>>(clazz: any, options?: FindOptions): Promise<T[]> {
+    public static async findAll<T extends DataObject<T>>(clazz: any, options: FindOptions = {}): Promise<T[]> {
         let objects: T[] = [];
         await Enemene.app.db.transaction(async t => {
             objects = await clazz.findAll({
@@ -247,6 +247,7 @@ export class DataService {
         } else {
             object = Enemene.app.db.model(data.$entity).build({
                 id: UuidService.getUuid(),
+                $entity: data.$entity,
             }, {
                 isNewRecord: true,
             }) as T;
@@ -254,7 +255,7 @@ export class DataService {
         const fields: Dictionary<EntityField, keyof T> = ModelService.getFields(data.$entity);
         for (const [key, field] of Object.entries(fields)) {
             if (field instanceof CompositionField) {
-                const subObjectData: Dictionary<any> = data[key] ?? data[field.foreignKey];
+                const subObjectData: Dictionary<any> = data[key] ?? data[field.foreignKey] ?? originalData?.[key] ?? originalData?.[field.foreignKey];
                 if (subObjectData) {
                     if (subObjectData.id) {
                         const subObject: DataObject<any> = await DataService.findNotNullById(field.classGetter(), subObjectData.id);
@@ -267,7 +268,7 @@ export class DataService {
                     }
                 }
             } else if (field instanceof ReferenceField) {
-                const subObjectId: uuid = data[key] ?? data[field.foreignKey];
+                const subObjectId: uuid = data[key] ?? data[field.foreignKey] ?? originalData?.[key] ?? originalData?.[field.foreignKey];
                 if (subObjectId) {
                     const referenceObject = await DataService.findNotNullById(field.classGetter(), subObjectId);
                     object[field.foreignKey as keyof T] = referenceObject.id as any;
@@ -283,16 +284,16 @@ export class DataService {
         return object;
     }
 
-    public static async filterFields<ENTITY extends DataObject<ENTITY>>(object: ENTITY, requestedFields: string[]): Promise<Dictionary<any, keyof ENTITY>> {
+    public static async filterFields<ENTITY extends DataObject<ENTITY>>(object: ENTITY, filterFields: string[]): Promise<Dictionary<any, keyof ENTITY>> {
         const result: any = {};
-        const requestedBaseFields: string[] = uniq(requestedFields.map((field: string) => field.replace(/\..*/, "")));
+        const requestedBaseFields: string[] = uniq(filterFields.map((field: string) => field.replace(/\..*/, "")));
         const fields: EntityField[] = Object.values(ModelService.FIELDS[object.$entity])
             .filter((field: EntityField) => requestedBaseFields.includes(field.name) || requestedBaseFields.includes("*"));
         for (const field of fields) {
             const key: keyof DataObject<any> = field.name as keyof DataObject<any>;
             let value = object[key];
             if (field instanceof ManyToManyField || field instanceof CompositionField || field instanceof CollectionField || field instanceof ReferenceField) {
-                let requestedSubFields: string[] = requestedFields
+                let requestedSubFields: string[] = filterFields
                     .filter((f: string) => f.startsWith(`${key}.`))
                     .map((f: string) => f.substr(f.indexOf(".") + 1));
                 if (!requestedSubFields.length) {
@@ -301,13 +302,9 @@ export class DataService {
 
                 if (isEqual(requestedSubFields, ["$count"])) {
                     // Only object count requested.
-                    result[`${key}.$count`] = await object.$count(key);
+                    result[`${key}.$count`] = object[key]?.length ?? 0;
                 } else {
                     // Also values requested.
-                    if (!value) {
-                        value = await object.$get(key) as any;
-                    }
-
                     if (!value) {
                         result[key] = null;
                     } else if (field instanceof ManyToManyField || field instanceof CollectionField) {

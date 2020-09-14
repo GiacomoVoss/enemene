@@ -8,6 +8,7 @@ export class CompositionField extends EntityField {
                 public foreignKey: string,
                 public required: boolean,) {
         super(name, label, EntityFieldType.COMPOSITION, required);
+        this.isSimpleField = false;
     }
 
     public toJSON(): any {

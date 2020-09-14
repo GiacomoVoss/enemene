@@ -7,6 +7,7 @@ export class ManyToManyField extends EntityField {
                 public classGetter: () => any,
                 public throughGetter: () => any) {
         super(name, label, EntityFieldType.COLLECTION, false);
+        this.isSimpleField = false;
     }
 
     public toJSON(): any {

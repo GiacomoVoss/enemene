@@ -1,4 +1,4 @@
-import {ContextParameterMissingError, Filter} from "..";
+import {Filter} from "..";
 import {FindOptions, IncludeOptions, WhereOptions} from "sequelize/types/lib/model";
 import {Op} from "sequelize";
 import {Enemene} from "../../../..";
@@ -19,9 +19,23 @@ export class FilterService {
         switch (filter.name) {
             case "equals":
                 if (prefix) {
-                    return {[`\$${prefix}.${FilterService.replaceContext(filter.parameters[0], context)}\$`]: FilterService.replaceContext(filter.parameters[1], context)};
+                    return {[`\$${prefix}.${FilterService.replaceContextAsString(filter.parameters[0], context)}\$`]: FilterService.replaceContext(filter.parameters[1], context)};
                 } else {
-                    return {[FilterService.replaceContext(filter.parameters[0], context)]: FilterService.replaceContext(filter.parameters[1], context)};
+                    return {[FilterService.replaceContextAsString(filter.parameters[0], context)]: FilterService.replaceContext(filter.parameters[1], context)};
+                }
+            case "like":
+                if (prefix) {
+                    return {
+                        [`\$${prefix}.${FilterService.replaceContextAsString(filter.parameters[0], context)}\$`]: {
+                            [Op.like]: `%${FilterService.replaceContext(filter.parameters[1], context)}%`
+                        }
+                    };
+                } else {
+                    return {
+                        [FilterService.replaceContextAsString(filter.parameters[0], context)]: {
+                            [Op.like]: `%${FilterService.replaceContext(filter.parameters[1], context)}%`
+                        }
+                    };
                 }
             case "and":
                 return {[Op.and]: filter.args.map(arg => FilterService.toSequelizeInternal(arg, context, includes, prefix))};
@@ -42,9 +56,9 @@ export class FilterService {
         return {};
     }
 
-    public static replaceContext(value: string | number, context: any): string | number {
+    private static replaceContextAsString(value: string | number, context: any): string {
         if (typeof value !== "string") {
-            return value;
+            return `${value}`;
         }
 
         let result: any = value;
@@ -56,10 +70,28 @@ export class FilterService {
                 const key: string = match.replace(/{([\w\d.]+)}/, "$1");
                 const replacementValue: string | number = get(context, key);
                 if (!replacementValue) {
-                    throw new ContextParameterMissingError(key);
+                    return null;
                 }
                 result = result.replace(match, replacementValue);
             });
+        }
+
+        return value;
+    }
+
+    private static replaceContext(value: string | number, context: any): string | number | boolean {
+        if (typeof value !== "string") {
+            return value;
+        }
+
+        let result: any = this.replaceContextAsString(value, context);
+
+        if (result === "true") {
+            return true;
+        }
+
+        if (result === "false") {
+            return false;
         }
 
         if (result.match(/^\d+(\.\d+)?$/)) {

@@ -36,7 +36,7 @@ export class LogService {
         this.logInternal(this.log.error, component, message);
     }
 
-    private static padRight: number = 25;
+    private static padRight: number = 30;
 
     private static logFormat = winston.format.combine(
         winston.format.timestamp({

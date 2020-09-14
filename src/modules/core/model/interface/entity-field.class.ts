@@ -3,6 +3,8 @@ import {serializable} from "../../../../base/type/serializable.type";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 
 export class EntityField {
+    public isSimpleField: boolean = true;
+
     constructor(public name: string,
                 public label: string | string[],
                 public type: EntityFieldType,

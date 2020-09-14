@@ -29,8 +29,11 @@ export default class ViewPostRouter {
         const fields: string[] = ViewService.getFields(view);
         const filteredData: Dictionary<serializable> = pick(data, fields);
 
-        let object = await DataService.create(view.entity(), filteredData, undefined, ViewService.getFindOptions(view, user, context));
-        return ViewService.findByIdByView(view, object.id, "*", user, context);
+        let object = await DataService.create(view.entity(), filteredData, undefined, ViewService.getFindOptions(view, ["*"], user, context));
+        return {
+            data: await ViewService.findById(view, object.id, ["*"], user, context),
+            model: ViewService.getModelForView(view),
+        };
     }
 
     @Post("/:view/:id/:attribute", true)
@@ -49,7 +52,7 @@ export default class ViewPostRouter {
 
         const fields: string[] = ViewService.getFields(baseView);
 
-        const baseObject: DataObject<ENTITY> = await DataService.findNotNullById(baseView.entity(), objectId, ViewService.getFindOptions(baseView, user, context));
+        const baseObject: DataObject<ENTITY> = await DataService.findNotNullById(baseView.entity(), objectId, ViewService.getFindOptions(baseView, [collectionField as string], user, context));
         const baseModel: Dictionary<EntityField, keyof ENTITY> = ModelService.getFields(baseView.entity().name);
 
         const subFields: string[] = fields

@@ -11,6 +11,8 @@ export namespace EntityFieldType {
     export const REFERENCE = "REFERENCE";
     export const COMPOSITION = "COMPOSITION";
     export const COLLECTION = "COLLECTION";
+    export const OBJECT = "OBJECT";
+    export const CALCULATED = "CALCULATED";
     export const ENUM = (values): string[] => {
         return Object.values(values);
     };

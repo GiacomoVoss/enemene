@@ -7,8 +7,10 @@ import {CompositionField} from "../interface/composition-field.class";
 import {CollectionField} from "../interface/collection-field.class";
 import {ReferenceField} from "../interface/reference-field.class";
 import {EntityFieldType} from "../enum/entity-field-type.enum";
-import {Enemene} from "../../application/enemene";
 import {EntityModel} from "../type/entity-model.type";
+import {IncludeOptions} from "sequelize";
+import {CalculatedField} from "../interface/calculated-field.class";
+import {Enemene} from "../../../..";
 
 export class ModelService {
 
@@ -59,6 +61,39 @@ export class ModelService {
         if (matches) {
             fields = matches.map((token: string) => token.replace(/[}{]/g, ""));
         }
-        return Object.values(this.getModel(object.$entity, fields)[entity]);
+        fields.push("id");
+        return Object.values(this.getModel(entity, fields)[entity]);
+    }
+
+    public static getIncludes(entity: string, fields: string[]): IncludeOptions[] {
+        const model: EntityModel = ModelService.getModel(entity, fields);
+        const includes = Object.values(model[entity]).map((field: EntityField) => {
+            if (!fields.includes(field.name)) {
+                return undefined;
+            }
+            if ([EntityFieldType.REFERENCE, EntityFieldType.COLLECTION, EntityFieldType.COMPOSITION].includes(field.type as string)) {
+
+                const subField: ReferenceField | CollectionField | CompositionField = field as ReferenceField | CollectionField | CompositionField;
+                const subFields: string[] = fields
+                    .filter((f: string) => f.startsWith(`${field.name}.`))
+                    .map((f: string) => f.substr(f.indexOf(".") + 1));
+                return [{
+                    model: (field as ReferenceField).classGetter(),
+                    as: field.name,
+                    include: this.getIncludes(subField.classGetter().name, subFields),
+                } as IncludeOptions];
+            }
+
+            if (field.type === EntityFieldType.CALCULATED) {
+                const subField: CalculatedField = field as CalculatedField;
+                return this.getIncludes(entity, subField.includeFields);
+            }
+            return undefined;
+        }).filter((includeOption: IncludeOptions[] | undefined) => !!includeOption)
+            .reduce((result: IncludeOptions[], includeOptions: IncludeOptions[]) => {
+                result.push(...includeOptions);
+                return result;
+            }, []);
+        return includes;
     }
 }

@@ -22,7 +22,7 @@ export default class ViewDeleteRouter {
         PermissionService.checkViewPermission(viewName, RequestMethod.DELETE, user);
         const view: View<any> = ViewService.getViewNotNull(viewName);
 
-        const object: DataObject<ENTITY> = await DataService.findNotNullById(view.entity(), objectId, ViewService.getFindOptions(view, user, context));
+        const object: DataObject<ENTITY> = await DataService.findNotNullById(view.entity(), objectId, ViewService.getFindOptions(view, ["*"], user, context));
 
         object.destroy();
     }
@@ -41,8 +41,8 @@ export default class ViewDeleteRouter {
             throw new ObjectNotFoundError();
         }
 
-        const object: ENTITY = await DataService.findNotNullById(baseView.entity(), objectId, ViewService.getFindOptions(baseView, user, context));
+        const object: ENTITY = await DataService.findNotNullById(baseView.entity(), objectId, ViewService.getFindOptions(baseView, ["*"], user, context));
         await object.$remove(collectionField as string, subObjectId);
-        
+
     }
 }

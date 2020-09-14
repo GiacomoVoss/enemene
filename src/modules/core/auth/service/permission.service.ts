@@ -8,6 +8,7 @@ import {RequestMethod} from "../../router/enum/request-method.enum";
 import {Permission} from "../enum/permission.enum";
 import {ViewService} from "../../view/service/view.service";
 import {Enemene} from "../../../..";
+import {ObjectNotFoundError} from "../../error/object-not-found.error";
 
 export class PermissionService {
 
@@ -47,13 +48,13 @@ export class PermissionService {
         const rolePermission: RoutePermission = PermissionService.permissionCache[user.roleId]?.route[fullPath]?.find((permission: RoutePermission) => permission.method === pathDefinition.method);
         const defaultPermission: RoutePermission = PermissionService.defaultPermissions.route[fullPath]?.find((permission: RoutePermission) => permission.method === pathDefinition.method);
         if (!rolePermission && !defaultPermission) {
-            throw new UnauthorizedError();
+            throw new ObjectNotFoundError();
         }
     }
 
     public static checkViewPermission(viewName: string, method: RequestMethod, user?: AbstractUser): void {
         if (!user) {
-            throw new UnauthorizedError();
+            throw new ObjectNotFoundError();
         }
         if (user.roleId === this.DEVELOPER_ROLE_ID) {
             return;
@@ -63,7 +64,7 @@ export class PermissionService {
             viewPermission = PermissionService.defaultPermissions.view[viewName];
         }
         if (!viewPermission) {
-            throw new UnauthorizedError();
+            throw new ObjectNotFoundError();
         }
         let permitted: boolean = false;
         switch (method) {
@@ -81,7 +82,7 @@ export class PermissionService {
                 break;
         }
         if (!permitted) {
-            throw new UnauthorizedError();
+            throw new ObjectNotFoundError();
         }
     }
 

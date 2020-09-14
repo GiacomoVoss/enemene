@@ -1,5 +1,6 @@
 export * from "./data-object.model";
 export * from "./enum/entity-field-type.enum";
+export * from "./decorator/calculated.decorator";
 export * from "./decorator/collection.decorator";
 export * from "./decorator/composition.decorator";
 export * from "./decorator/entity.decorator";

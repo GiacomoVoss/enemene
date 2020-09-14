@@ -1,3 +1,5 @@
+import {serializable} from "../../../../base/type/serializable.type";
+
 export class Filter {
     constructor(public name: string,
                 public args: Filter[] = [],
@@ -26,7 +28,7 @@ export class Filter {
         );
     }
 
-    public static equals(field: string, value: string | number): Filter {
+    public static equals(field: string, value: serializable): Filter {
         return new Filter(
             "equals",
             undefined,
@@ -39,6 +41,14 @@ export class Filter {
             "exists",
             arg ? [arg] : [],
             [entity, field],
+        );
+    }
+
+    public static like(field: string, value: string): Filter {
+        return new Filter(
+            "like",
+            undefined,
+            [field, value]
         );
     }
 }

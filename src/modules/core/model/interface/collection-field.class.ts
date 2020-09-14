@@ -7,6 +7,7 @@ export class CollectionField extends EntityField {
                 public classGetter: () => any,
                 public foreignKey: string,) {
         super(name, label, EntityFieldType.COLLECTION, false);
+        this.isSimpleField = false;
     }
 
     public toJSON(): any {
