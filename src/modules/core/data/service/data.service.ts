@@ -32,10 +32,9 @@ export class DataService {
     public static async count<T extends DataObject<T>>(clazz: any, options?: FindOptions): Promise<number> {
         const countOptions: CountOptions = {
             col: "id",
-            distinct: true,
         };
         return clazz.count({
-            ...options,
+            where: options.where,
             ...countOptions
         });
     }
