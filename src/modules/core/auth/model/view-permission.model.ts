@@ -17,7 +17,7 @@ export class ViewPermission extends DataObject<ViewPermission> implements AfterC
     @Field("Berechtigungen", EntityFieldType.STRING, true)
     permissions: string;
 
-    @Reference("Rolle", () => Role, true)
+    @Reference("Rolle", () => Role, false)
     role: Role;
 
     roleId: string;

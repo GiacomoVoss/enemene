@@ -53,13 +53,15 @@ export class PermissionService {
     }
 
     public static checkViewPermission(viewName: string, method: RequestMethod, user?: AbstractUser): void {
+        let viewPermission: ViewPermission;
         if (!user) {
-            throw new ObjectNotFoundError();
+            viewPermission = PermissionService.permissionCache["PUBLIC"]?.view[viewName];
+        } else {
+            viewPermission = PermissionService.permissionCache[user.roleId]?.view[viewName];
         }
-        if (user.roleId === this.DEVELOPER_ROLE_ID) {
+        if (user && user.roleId === this.DEVELOPER_ROLE_ID) {
             return;
         }
-        let viewPermission: ViewPermission = PermissionService.permissionCache[user.roleId]?.view[viewName];
         if (!viewPermission) {
             viewPermission = PermissionService.defaultPermissions.view[viewName];
         }
@@ -87,6 +89,9 @@ export class PermissionService {
     }
 
     private static registerPermission(permission: RoutePermission | ViewPermission) {
+        if (!permission.roleId) {
+            permission.roleId = "PUBLIC";
+        }
         if (!PermissionService.permissionCache[permission.roleId]) {
             PermissionService.permissionCache[permission.roleId] = {
                 route: {},

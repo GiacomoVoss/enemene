@@ -317,7 +317,7 @@ export class DataService {
                 }
 
             } else {
-                result[key] = value ?? null;
+                result[key] = (object.toJSON ? object.toJSON()?.[key] : object[key]) ?? null;
             }
         }
 

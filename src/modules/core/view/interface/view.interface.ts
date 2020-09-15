@@ -1,10 +1,10 @@
 import {SchemaMap} from "@hapi/joi";
 import {Order} from "sequelize";
-import {ViewFieldDefinition} from "./view-field-definition.interface";
 import {DataObject} from "../../model";
 import {ConstructorOf} from "../../../../base/constructor-of";
 import {Filter} from "../../filter";
 import {AbstractAction} from "../../action";
+import {ViewField} from "./view-field.interface";
 
 export interface View<ENTITY extends DataObject<ENTITY>> {
 
@@ -16,7 +16,7 @@ export interface View<ENTITY extends DataObject<ENTITY>> {
     /**
      * Fields to include.
      */
-    fields: (ViewFieldDefinition<ENTITY, any> | keyof ENTITY | string)[];
+    fields: ViewField<ENTITY>[];
 
     /**
      * Validation schema for updating/creating objects through the view.

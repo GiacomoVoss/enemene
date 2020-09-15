@@ -76,7 +76,7 @@ export class FilterService {
             });
         }
 
-        return value;
+        return result;
     }
 
     private static replaceContext(value: string | number, context: any): string | number | boolean {

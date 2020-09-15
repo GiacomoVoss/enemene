@@ -19,6 +19,7 @@ import {AuthService} from "../../auth/service/auth.service";
 import {ReferenceField} from "../../model/interface/reference-field.class";
 import {CalculatedField} from "../../model/interface/calculated-field.class";
 import {RuntimeError} from "../../application/error/runtime.error";
+import {ViewField} from "../interface/view-field.interface";
 
 /**
  * Service for handling views for data manipulation.
@@ -188,10 +189,21 @@ export class ViewService {
         find.limit = additionalFindOptions.limit;
         find.offset = additionalFindOptions.offset;
         find.include = additionalFindOptions.include ?? [];
-        find.attributes = ["id"];
+        ViewService.addIncludeAndAttributes(view.entity().name, view.fields, find);
 
-        const model = ModelService.getFields(view.entity().name);
-        for (const field of view.fields) {
+        return find;
+    }
+
+
+    public static addIncludeAndAttributes(entity: string, fields: ViewField<any>[], findOptions: FindOptions = {}): void {
+        const model = ModelService.getFields(entity);
+        if (!findOptions.attributes) {
+            findOptions.attributes = ["id"];
+        }
+        if (!findOptions.include) {
+            findOptions.include = [];
+        }
+        for (const field of fields) {
             let fieldName: string;
             if (typeof field === "string") {
                 fieldName = field;
@@ -207,29 +219,26 @@ export class ViewService {
                 throw new RuntimeError(`Unknown field "${fieldName}".`);
             }
             if (entityField.isSimpleField || entityField instanceof CalculatedField) {
-                find.attributes.push(fieldName);
+                (findOptions.attributes as string[]).push(fieldName);
                 if (entityField instanceof CalculatedField) {
-                    find.include.push(...ModelService.getIncludes(view.entity().name, entityField.includeFields));
+                    ViewService.addIncludeAndAttributes(entity, entityField.includeFields, findOptions);
                 }
             } else {
                 const include: IncludeOptions = {model: (entityField as ReferenceField).classGetter(), as: fieldName};
                 if (typeof field === "string") {
                     include.attributes = ModelService.getDisplayPatternFields((entityField as ReferenceField).classGetter().name).map((ef: EntityField) => ef.name);
                 } else {
-                    const subFindOptions = ViewService.getFindOptions(
-                        (field as ViewFieldDefinition<any, any>).view,
-                        requestedFields
-                            .filter((f: string) => f.startsWith(`${fieldName}.`))
-                            .map((f: string) => f.substr(f.indexOf(".") + 1))
+                    ViewService.addIncludeAndAttributes(
+                        (field as ViewFieldDefinition<any, any>).view.entity().name,
+                        (field as ViewFieldDefinition<any, any>).view.fields,
+                        include,
                     );
-                    include.attributes = subFindOptions.attributes;
                 }
-                find.include.push(include);
+                findOptions.include.push(include);
             }
         }
-
-        return find;
     }
+
 
     public static getModelForView(view: View<any>, language?: string): Dictionary<serializable> {
         let model: EntityModel = ModelService.getModel(view.entity().name, ViewService.getFields(view));

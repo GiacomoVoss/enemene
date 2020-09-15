@@ -10,6 +10,10 @@ import {Dictionary} from "../../../base/type/dictionary.type";
 import {serializable} from "../../../base/type/serializable.type";
 import {PermissionService} from "../auth/service/permission.service";
 import {ObjectNotFoundError} from "../error/object-not-found.error";
+import {EntityField} from "../model/interface/entity-field.class";
+import {ModelService} from "../model/service/model.service";
+import {RuntimeError} from "../application/error/runtime.error";
+import {ReferenceField} from "../model/interface/reference-field.class";
 
 @RouterModule("view")
 export default class ViewDeleteRouter {
@@ -34,15 +38,21 @@ export default class ViewDeleteRouter {
                                                                     @Path("attribute") collectionField: keyof ENTITY,
                                                                     @Path("subId") subObjectId: uuid,
                                                                     @Context() context: Dictionary<serializable>): Promise<void> {
-        PermissionService.checkViewPermission(viewName, RequestMethod.POST, user);
+        PermissionService.checkViewPermission(viewName, RequestMethod.DELETE, user);
 
         const baseView: View<ENTITY> = ViewService.getViewNotNull(viewName);
         if (!baseView.fields.find(field => (field as string) === collectionField || (field as ViewFieldDefinition<ENTITY, any>).field === collectionField)) {
             throw new ObjectNotFoundError();
         }
-
-        const object: ENTITY = await DataService.findNotNullById(baseView.entity(), objectId, ViewService.getFindOptions(baseView, ["*"], user, context));
-        await object.$remove(collectionField as string, subObjectId);
-
+        const field: EntityField = ModelService.getFields<ENTITY>(baseView.entity().name)[collectionField];
+        if (field.isSimpleField) {
+            throw new RuntimeError(`Cannot delete simple data field "${collectionField}".`);
+        }
+        const baseObject: ENTITY = await DataService.findNotNullById(baseView.entity(), objectId, ViewService.getFindOptions(baseView, [collectionField as string], user, context));
+        const object: DataObject<any> = await DataService.findById((field as ReferenceField).classGetter(), subObjectId);
+        if (object) {
+            object.destroy();
+            await baseObject.$remove(collectionField as string, subObjectId);
+        }
     }
 }
