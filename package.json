@@ -1,6 +1,6 @@
 {
   "name": "enemene",
-  "version": "0.2.14",
+  "version": "0.2.15",
   "description": "An opinionated approach to a powerful and easy to handle express web server.",
   "repository": "http://github.com/GiacomoVoss/enemene",
   "scripts": {
