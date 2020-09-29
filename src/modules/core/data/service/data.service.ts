@@ -114,7 +114,6 @@ export class DataService {
             object = await DataService.populate(data, object);
 
             ValidationService.validate(object, validation);
-
             await object.save({transaction: t});
         });
     }
@@ -239,7 +238,7 @@ export class DataService {
         return findOptions;
     }
 
-    public static async populate<T extends DataObject<T>>(data: Dictionary<any>, originalData?: T, t?: any): Promise<T> {
+    public static async populate<T extends DataObject<T>>(data: Dictionary<any>, originalData?: T): Promise<T> {
         let object: T;
         if (originalData) {
             object = originalData;

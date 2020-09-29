@@ -20,12 +20,26 @@ export default class ViewGetRouter {
     @Get("/count/:view", true)
     async countObjects<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
                                                           @Path("view") viewName: string,
+                                                          @Query("search") search: string,
                                                           @Context() context: Dictionary<serializable>): Promise<object> {
         PermissionService.checkViewPermission(viewName, RequestMethod.GET, user);
         const view: View<ENTITY> = ViewService.getViewNotNull(viewName);
+        const findOptions: FindOptions = {};
+        if (view.searchAttributes && search) {
+            findOptions.where = {
+                ...(findOptions.where ?? {}),
+                [Op.or]: view.searchAttributes.reduce((result: WhereOptions, attribute: string) => {
+                    result[attribute] = {
+                        [Op.like]: `%${search}%`,
+                    };
+                    return result;
+                }, {})
+            };
+        }
+
         return {
             data: {
-                count: await DataService.count(view.entity(), ViewService.getFindOptions(view, ["id"], user, context))
+                count: await DataService.count(view.entity(), ViewService.getFindOptions(view, ["id"], user, context, findOptions))
             },
         };
     }

@@ -22,9 +22,6 @@ export class DataObject<E> extends Model<DataObject<E>> {
         super(values, options);
     }
 
-    /**
-     * Turns the object into JSON based on the {@link jsonDefinition}.
-     */
     toJSON(): any {
         return super.toJSON();
         // function unfold(value) {
