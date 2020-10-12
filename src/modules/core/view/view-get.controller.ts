@@ -1,10 +1,10 @@
-import {Context, CurrentUser, Get, Path, Query, RouterModule} from "../router";
+import {Context, Controller, CurrentUser, Get, Path, Query} from "../router";
 import {AbstractUser} from "../auth";
 import {ViewService} from "./service/view.service";
 import {DataResponse, DataService} from "../data";
 import {DataObject} from "../model";
 import {RequestMethod} from "../router/enum/request-method.enum";
-import {View, ViewFieldDefinition} from "./";
+import {ViewFieldDefinition} from "./";
 import {UnauthorizedError} from "../auth/error/unauthorized.error";
 import {Dictionary} from "../../../base/type/dictionary.type";
 import {uuid} from "../../../base/type/uuid.type";
@@ -13,17 +13,27 @@ import {PermissionService} from "../auth/service/permission.service";
 import {ObjectNotFoundError} from "../error/object-not-found.error";
 import {Header, HttpHeader} from "../router/decorator/parameter/header.decorator";
 import {FindOptions, Op, WhereOptions} from "sequelize";
+import {Enemene} from "../../..";
+import {AbstractController} from "../router/class/abstract-controller.class";
+import {ModelService} from "../model/service/model.service";
+import {View} from "./class/view.class";
 
-@RouterModule("view")
-export default class ViewGetRouter {
+@Controller("view")
+export default class ViewGetController extends AbstractController {
+
+    private viewService: ViewService = Enemene.app.inject(ViewService);
+
+    getView<ENTITY extends DataObject<ENTITY>>(viewName: string, user: AbstractUser): View<ENTITY> {
+        Enemene.app.inject(PermissionService).checkViewPermission(viewName, RequestMethod.GET, user);
+        return this.viewService.getViewNotNull(viewName);
+    }
 
     @Get("/count/:view", true)
     async countObjects<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
                                                           @Path("view") viewName: string,
                                                           @Query("search") search: string,
                                                           @Context() context: Dictionary<serializable>): Promise<object> {
-        PermissionService.checkViewPermission(viewName, RequestMethod.GET, user);
-        const view: View<ENTITY> = ViewService.getViewNotNull(viewName);
+        const view: View<ENTITY> = this.getView(viewName, user);
         const findOptions: FindOptions = {};
         if (view.searchAttributes && search) {
             findOptions.where = {
@@ -39,7 +49,7 @@ export default class ViewGetRouter {
 
         return {
             data: {
-                count: await DataService.count(view.entity(), ViewService.getFindOptions(view, ["id"], user, context, findOptions))
+                count: await DataService.count(view.entity(), this.viewService.getFindOptions(view, ["id"], user, context, findOptions))
             },
         };
     }
@@ -47,15 +57,14 @@ export default class ViewGetRouter {
     @Get("/:view", true)
     async getObjects<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
                                                         @Path("view") viewName: string,
-                                                        @Query("fields") requestedFields: string = "*",
+                                                        @Query("fields") requestedFields: string,
                                                         @Query("order") order: string,
                                                         @Query("limit") limit: string,
                                                         @Query("offset") offset: string,
                                                         @Query("search") search: string,
                                                         @Context() context: Dictionary<serializable>,
                                                         @Header(HttpHeader.LANGUAGE) language: string): Promise<DataResponse<ENTITY>> {
-        PermissionService.checkViewPermission(viewName, RequestMethod.GET, user);
-        const view: View<ENTITY> = ViewService.getViewNotNull(viewName);
+        const view: View<ENTITY> = this.getView(viewName, user);
 
         const findOptions: FindOptions = DataService.getFindOptions(order, limit, offset);
         if (view.searchAttributes && search) {
@@ -70,8 +79,9 @@ export default class ViewGetRouter {
             };
         }
         return {
-            data: await ViewService.findAll(view, ViewService.getRequestedFields(requestedFields), user, context, findOptions),
-            model: ViewService.getModelForView(view, language),
+            data: await this.viewService.findAll(view, this.viewService.getRequestedFields(requestedFields ?? "*"), user, context, findOptions),
+            model: view.getModel(language),
+            actions: view.getActionConfigurations(),
         };
     }
 
@@ -81,11 +91,11 @@ export default class ViewGetRouter {
                                                        @Path("id") objectId: string,
                                                        @Query("fields") requestedFields: string,
                                                        @Context() context: Dictionary<serializable>): Promise<DataResponse<ENTITY>> {
-        PermissionService.checkViewPermission(viewName, RequestMethod.GET, user);
-        const view: View<ENTITY> = ViewService.getViewNotNull(viewName);
+        const view: View<ENTITY> = this.getView(viewName, user);
         return {
-            data: await ViewService.findById(view, objectId, ViewService.getRequestedFields(requestedFields), user, context),
-            model: ViewService.getModelForView(view),
+            data: await this.viewService.findById(view, objectId, this.viewService.getRequestedFields(requestedFields), user, context),
+            model: view.getModel(),
+            actions: view.getActionConfigurations(),
         };
     }
 
@@ -96,18 +106,16 @@ export default class ViewGetRouter {
                                                            @Path("attribute") collectionField: keyof ENTITY,
                                                            @Query("fields") requestedFields: string,
                                                            @Context() context: Dictionary<serializable>): Promise<DataResponse<any>> {
-        PermissionService.checkViewPermission(viewName, RequestMethod.GET, user);
-
-        const baseView: View<ENTITY> = ViewService.getViewNotNull(viewName);
-        if (!baseView.fields.find(field => (field as string) === collectionField || (field as ViewFieldDefinition<ENTITY, any>).field === collectionField)) {
+        const baseView: View<ENTITY> = this.getView(viewName, user);
+        if (!baseView.$fields.find(field => field.name === collectionField)) {
             throw new ObjectNotFoundError();
         }
 
-        const fields: string[] = ViewService.getFields(baseView, ViewService.getRequestedFields(requestedFields));
-        const model = ViewService.getModelForView(baseView);
+        const fields: string[] = baseView.getFields(this.viewService.getRequestedFields(requestedFields));
+        const model = baseView.getModel();
 
         let subFields: string[] = fields.filter(field => field.startsWith(`${String(collectionField)}.`));
-        const data: DataObject<ENTITY> = await DataService.findNotNullById(baseView.entity(), objectId, ViewService.getFindOptions(baseView, [collectionField as string], user, context));
+        const data: DataObject<ENTITY> = await DataService.findNotNullById(baseView.entity(), objectId, this.viewService.getFindOptions(baseView, [collectionField as string], user, context));
 
         const subData: Partial<ENTITY> = await DataService.filterFields(data, subFields) as Partial<ENTITY>;
         return {
@@ -124,17 +132,16 @@ export default class ViewGetRouter {
                                                                  @Path("subId") subObjectId: uuid,
                                                                  @Query("fields") requestedFields: string,
                                                                  @Context() context: Dictionary<serializable>): Promise<DataResponse<any>> {
-        PermissionService.checkViewPermission(viewName, RequestMethod.GET, user);
+        const baseView: View<ENTITY> = this.getView(viewName, user);
 
-        const baseView: View<ENTITY> = ViewService.getViewNotNull(viewName);
-        if (!baseView.fields.find(field => (field as string) === collectionField || (field as ViewFieldDefinition<ENTITY, any>).field === collectionField)) {
+        if (!baseView.$fields.find(field => field.name === collectionField)) {
             throw new UnauthorizedError();
         }
 
-        const fields = ViewService.getRequestedFields(requestedFields).map((field: string) => `${collectionField}.${field}`);
+        const fields = this.viewService.getRequestedFields(requestedFields).map((field: string) => `${collectionField}.${field}`);
 
-        const data: DataObject<ENTITY> = await DataService.findNotNullById(baseView.entity(), objectId, ViewService.getFindOptions(baseView, fields, user, context));
-        const model = ViewService.getModelForView(baseView);
+        const data: DataObject<ENTITY> = await DataService.findNotNullById(baseView.entity(), objectId, this.viewService.getFindOptions(baseView, fields, user, context));
+        const model = baseView.getModel();
 
         const subData: Dictionary<any, keyof ENTITY> = await DataService.filterFields(data, fields);
 
@@ -154,10 +161,8 @@ export default class ViewGetRouter {
     @Get("/model/:view", true)
     async getViewModel(@CurrentUser user: AbstractUser,
                        @Path("view") viewName: string): Promise<Dictionary<serializable>> {
-        PermissionService.checkViewPermission(viewName, RequestMethod.GET, user);
-        const view: View<any> = ViewService.getViewNotNull(viewName);
-
-        return ViewService.getModelForView(view);
+        const view: View<any> = this.getView(viewName, user);
+        return view.getModel();
     }
 
     @Get("/allowedValues/:view/:attribute", true)
@@ -165,23 +170,17 @@ export default class ViewGetRouter {
                                                                        @Path("view") viewName: string,
                                                                        @Path("attribute") collectionField: keyof ENTITY,
                                                                        @Context() context: Dictionary<serializable>): Promise<DataResponse<any>> {
-        PermissionService.checkViewPermission(viewName, RequestMethod.GET, user);
+        const baseView: View<ENTITY> = this.getView(viewName, user);
 
-        const baseView: View<ENTITY> = ViewService.getViewNotNull(viewName);
-        const collectionFieldDefinition: ViewFieldDefinition<ENTITY, any> | undefined = baseView.fields
-            .filter(field => typeof field !== "string")
-            .find((field: ViewFieldDefinition<ENTITY, any>) => field.field === collectionField) as ViewFieldDefinition<ENTITY, any>;
+        const collectionViewField: ViewFieldDefinition<ENTITY> | undefined = baseView.$fields
+            .find((field: ViewFieldDefinition<ENTITY>) => field.name === collectionField);
 
-        if (!collectionFieldDefinition || !collectionFieldDefinition.allowedValuesView) {
+        if (!collectionViewField) {
             throw new ObjectNotFoundError();
         }
 
-        const view: View<any> = collectionFieldDefinition.view;
-        const data: Dictionary<any, keyof ENTITY>[] = await ViewService.findAll(view, ["*"], user, context);
-        const model = ViewService.getModelForView(view);
-        return {
-            data: await Promise.all(data.map((object: DataObject<any>) => ViewService.filterFields(object, view, ["*"]))) as Partial<any>[],
-            model,
-        };
+        const object: ENTITY = new (baseView.entity())();
+
+        return ModelService.getAllowedValues(object, collectionViewField.name as keyof ENTITY, user);
     }
 }

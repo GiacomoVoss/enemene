@@ -7,6 +7,7 @@ import {Reference} from "../../model/decorator/reference.decorator";
 import {EntityFieldType} from "../../model/enum/entity-field-type.enum";
 import {PermissionService} from "../service/permission.service";
 import {AfterCreateHook} from "../../data";
+import {Enemene} from "../../../..";
 
 @Entity
 export class ViewPermission extends DataObject<ViewPermission> implements AfterCreateHook {
@@ -27,6 +28,6 @@ export class ViewPermission extends DataObject<ViewPermission> implements AfterC
     }
 
     async onAfterCreate(): Promise<void> {
-        PermissionService.buildCache();
+        Enemene.app.inject(PermissionService).buildCache();
     }
 }

@@ -19,6 +19,7 @@ import {uuid} from "../../../../base/type/uuid.type";
 import {AfterCreateHook, BeforeCreateHook} from "..";
 import {Validate} from "../../validation/class/validate.class";
 import {RuntimeError} from "../../application/error/runtime.error";
+import {BeforeDeleteHook} from "../interface/before-delete-hook.interface";
 
 /**
  * Service to retrieve data from the model.
@@ -112,9 +113,26 @@ export class DataService {
         await Enemene.app.db.transaction(async t => {
             data.$entity = clazz.name;
             object = await DataService.populate(data, object);
+            console.log(object);
 
             ValidationService.validate(object, validation);
             await object.save({transaction: t});
+        });
+    }
+
+    /**
+     * Deletes an object.
+     *
+     * @param clazz
+     * @param object            - The object to delete.
+     */
+    public static async delete<T extends DataObject<T>>(clazz: any, object: DataObject<T>): Promise<void> {
+        await Enemene.app.db.transaction(async t => {
+            if ((object as unknown as BeforeDeleteHook).onBeforeDelete) {
+                await (object as unknown as BeforeDeleteHook).onBeforeDelete();
+            }
+
+            await object.destroy({transaction: t});
         });
     }
 
@@ -153,6 +171,7 @@ export class DataService {
                 });
 
                 if (found != 1) {
+                    await t.rollback();
                     throw new UnauthorizedError();
                 }
             }
@@ -194,7 +213,7 @@ export class DataService {
                         ...where,
                         ...filter
                     },
-                    transaction: t
+                    transaction: t,
                 });
 
                 if (found != 1) {
@@ -226,6 +245,7 @@ export class DataService {
             if (ordersArray.length) {
                 findOptions.order = ordersArray;
             }
+            console.log(findOptions.order);
         }
         if (limit && !isNaN(parseInt(limit))) {
             findOptions.limit = parseInt(limit);
@@ -259,16 +279,22 @@ export class DataService {
                         const subObject: DataObject<any> = await DataService.findNotNullById(field.classGetter(), subObjectData.id);
                         await DataService.update(field.classGetter(), subObject, subObjectData);
                         object[field.foreignKey] = subObjectData.id;
+                        object[field.name] = subObjectData;
                     } else {
                         const subObject = await DataService.create(field.classGetter(), subObjectData);
                         object.$set(key as keyof T, subObject);
                         object[field.foreignKey] = subObject.id;
+                        object[field.name] = subObject;
                     }
                 }
             } else if (field instanceof ReferenceField) {
-                const subObjectId: uuid = data[key] ?? data[field.foreignKey] ?? originalData?.[key] ?? originalData?.[field.foreignKey];
-                if (subObjectId) {
-                    const referenceObject = await DataService.findNotNullById(field.classGetter(), subObjectId);
+                const subObjectData: uuid | Dictionary<serializable> = data[key] ?? data[field.foreignKey] ?? originalData?.[key] ?? originalData?.[field.foreignKey];
+                if (typeof subObjectData === "string") {
+                    const referenceObject = await DataService.findNotNullById(field.classGetter(), subObjectData);
+                    object[field.foreignKey as keyof T] = referenceObject.id as any;
+                    object[key as keyof T] = referenceObject as any;
+                } else {
+                    const referenceObject = await DataService.findNotNullById(field.classGetter(), subObjectData.id as string);
                     object[field.foreignKey as keyof T] = referenceObject.id as any;
                     object[key as keyof T] = referenceObject as any;
                 }

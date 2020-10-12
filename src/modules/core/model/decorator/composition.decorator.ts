@@ -11,8 +11,11 @@ export function Composition(label: string | string[], classGetter: () => any, re
         fields[propertyKey] = new CompositionField(propertyKey, label, classGetter, `${propertyKey}Id`, required);
         ModelService.FIELDS[target.constructor.name] = fields;
         sq.BelongsTo(classGetter, {
-            foreignKey: `${propertyKey}Id`
+            foreignKey: `${propertyKey}Id`,
+            onDelete: "CASCADE",
+            onUpdate: "CASCADE",
         })(target, propertyKey, descriptor);
+        sq.ForeignKey(classGetter)(target, propertyKey);
         sq.Column({
             type: DataType.STRING,
             allowNull: !required

@@ -7,6 +7,7 @@ import {Reference} from "../../model/decorator/reference.decorator";
 import {EntityFieldType} from "../../model/enum/entity-field-type.enum";
 import {AfterCreateHook} from "../../data";
 import {PermissionService} from "../service/permission.service";
+import {Enemene} from "../../../..";
 
 @Entity
 export class RoutePermission extends DataObject<RoutePermission> implements AfterCreateHook {
@@ -23,6 +24,6 @@ export class RoutePermission extends DataObject<RoutePermission> implements Afte
     roleId: string;
 
     async onAfterCreate(): Promise<void> {
-        PermissionService.buildCache();
+        Enemene.app.inject(PermissionService).buildCache();
     }
 }

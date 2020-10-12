@@ -1,10 +1,9 @@
-import {Body, Context, CurrentUser, Path, Post, RouterModule} from "../router";
+import {Body, Context, Controller, CurrentUser, Path, Post} from "../router";
 import {ViewService} from "./service/view.service";
 import {DataResponse, DataService} from "../data";
 import {DataObject} from "../model";
 import {AbstractUser} from "../auth";
 import {RequestMethod} from "../router/enum/request-method.enum";
-import {View, ViewFieldDefinition} from "./";
 import {UnauthorizedError} from "../auth/error/unauthorized.error";
 import {Dictionary} from "../../../base/type/dictionary.type";
 import {EntityField} from "../model/interface/entity-field.class";
@@ -15,24 +14,33 @@ import {ModelService} from "../model/service/model.service";
 import {CollectionField} from "../model/interface/collection-field.class";
 import {CompositionField} from "../model/interface/composition-field.class";
 import {PermissionService} from "../auth/service/permission.service";
+import {Enemene} from "../../..";
+import {AbstractController} from "../router/class/abstract-controller.class";
+import {View} from "./class/view.class";
 
-@RouterModule("view")
-export default class ViewPostRouter {
+@Controller("view")
+export default class ViewPostController extends AbstractController {
+
+    private viewService: ViewService = Enemene.app.inject(ViewService);
+
+    getView<ENTITY extends DataObject<ENTITY>>(viewName: string, user: AbstractUser): View<ENTITY> {
+        Enemene.app.inject(PermissionService).checkViewPermission(viewName, RequestMethod.POST, user);
+        return this.viewService.getViewNotNull(viewName);
+    }
 
     @Post("/:view", true)
     async createObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
                                                           @Path("view") viewName: string,
                                                           @Body() data: Dictionary<serializable>,
                                                           @Context() context: Dictionary<serializable>): Promise<DataResponse<ENTITY>> {
-        PermissionService.checkViewPermission(viewName, RequestMethod.POST, user);
-        const view: View<any> = ViewService.getViewNotNull(viewName);
-        const fields: string[] = ViewService.getFields(view);
+        const view: View<ENTITY> = this.getView(viewName, user);
+        const fields: string[] = view.getFields();
         const filteredData: Dictionary<serializable> = pick(data, fields);
 
-        let object = await DataService.create(view.entity(), filteredData, undefined, ViewService.getFindOptions(view, ["*"], user, context));
+        let object = await DataService.create(view.entity(), filteredData, undefined, this.viewService.getFindOptions(view, ["*"], user, context));
         return {
-            data: await ViewService.findById(view, object.id, ["*"], user, context),
-            model: ViewService.getModelForView(view),
+            data: await this.viewService.findById(view, object.id, ["*"], user, context),
+            model: view.getModel(),
         };
     }
 
@@ -43,16 +51,14 @@ export default class ViewPostRouter {
                                                                     @Path("attribute") collectionField: keyof ENTITY,
                                                                     @Body() data: Dictionary<serializable>,
                                                                     @Context() context: Dictionary<serializable>): Promise<DataResponse<ENTITY>> {
-        PermissionService.checkViewPermission(viewName, RequestMethod.POST, user);
-
-        const baseView: View<ENTITY> = ViewService.getViewNotNull(viewName);
-        if (!baseView.fields.find(field => (field as string) === collectionField || (field as ViewFieldDefinition<ENTITY, any>).field === collectionField)) {
+        const baseView: View<ENTITY> = this.getView(viewName, user);
+        if (!baseView.$fields.find(field => field.name === collectionField)) {
             throw new UnauthorizedError();
         }
 
-        const fields: string[] = ViewService.getFields(baseView);
+        const fields: string[] = baseView.getFields();
 
-        const baseObject: DataObject<ENTITY> = await DataService.findNotNullById(baseView.entity(), objectId, ViewService.getFindOptions(baseView, [collectionField as string], user, context));
+        const baseObject: DataObject<ENTITY> = await DataService.findNotNullById(baseView.entity(), objectId, this.viewService.getFindOptions(baseView, [collectionField as string], user, context));
         const baseModel: Dictionary<EntityField, keyof ENTITY> = ModelService.getFields(baseView.entity().name);
 
         const subFields: string[] = fields

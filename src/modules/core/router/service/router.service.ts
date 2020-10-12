@@ -13,50 +13,47 @@ import {PermissionService} from "../../auth/service/permission.service";
 import {Enemene} from "../../../..";
 import {InputValidationError} from "../../validation/error/input-validation.error";
 import {Redirect} from "../class/redirect.class";
+import {ConstructorOf} from "../../../../base/constructor-of";
+import {AbstractController} from "../class/abstract-controller.class";
 
 export class RouterService {
 
-    public static paths: Dictionary<Dictionary<PathDefinition>, RequestMethod> = {
+    public paths: Dictionary<Dictionary<PathDefinition>, RequestMethod> = {
         [RequestMethod.GET]: {},
         [RequestMethod.PUT]: {},
         [RequestMethod.POST]: {},
         [RequestMethod.DELETE]: {},
     };
 
-    public static register(moduleName: string, path: PathDefinition): void {
-        let fullPath: string = `/${moduleName}`;
-        if (path.path === "/") {
-            this.paths[path.method][fullPath] = path;
-            return;
-        }
+    private controllers: Dictionary<any> = {};
 
-        if (!path.path.startsWith("/")) {
-            fullPath += "/";
-        }
-        fullPath += path.path;
-        this.paths[path.method][fullPath] = path;
-    }
-
-    private static async handler(req: SecureRequest, res: Response, next: Function, pathDefinition: PathDefinition): Promise<void> {
-        const pathFunction: Function = pathDefinition.fn;
-        const parameterValues: any[] = pathDefinition.parameters.map((param: string[]) => this.resolveParameter(req, res, param));
-        const result: any | Redirect = await pathFunction.apply(this, parameterValues);
-        if (result instanceof Redirect) {
-            res.redirect(result.url);
-        } else {
-            res.send(result);
-        }
-    }
+    private permissionService: PermissionService = Enemene.app.inject(PermissionService);
 
     public static hasRoute(method: RequestMethod, route: string): boolean {
         let routeToSearch: string = route;
         if (!routeToSearch.startsWith("/")) {
             routeToSearch = `/${routeToSearch}`;
         }
-        return Object.keys(this.paths[method] ?? []).includes(routeToSearch);
+        return Object.keys(Enemene.app.inject(RouterService).paths[method] ?? []).includes(routeToSearch);
     }
 
-    public static loadPaths(app: Application): void {
+    public register(router: ConstructorOf<AbstractController>, pathDefinition: PathDefinition): void {
+        const moduleName: string = router.prototype.$modulePath;
+        let fullPath: string = `/${moduleName}`;
+        if (pathDefinition.path === "/") {
+            this.paths[pathDefinition.method][fullPath] = pathDefinition;
+            return;
+        }
+
+        if (!pathDefinition.path.startsWith("/")) {
+            fullPath += "/";
+        }
+        fullPath += pathDefinition.path;
+        pathDefinition.controller = router;
+        this.paths[pathDefinition.method][fullPath] = pathDefinition;
+    }
+
+    public loadPaths(app: Application): void {
         let count: number = 0;
         Object.keys(this.paths).forEach((method: RequestMethod) => {
             const paths: string[] = Object.keys(this.paths[method]);
@@ -66,10 +63,10 @@ export class RouterService {
                 let handlers: express.RequestHandler[] = [
                     authenticatedGuard,
                     (req: SecureRequest, res: Response, next: NextFunction) => {
-                        PermissionService.checkRoutePermission(path, pathDefinition, req.payload);
+                        this.permissionService.checkRoutePermission(path, pathDefinition, req.payload);
                         next();
                     },
-                    (req, res, next) => this.handler(req as SecureRequest, res, next, pathDefinition),
+                    (req, res, next) => this.handle(req as SecureRequest, res, next, pathDefinition),
                 ];
                 switch (pathDefinition.method) {
                     case RequestMethod.GET:
@@ -85,14 +82,54 @@ export class RouterService {
                         app.delete(`/api${path}`, ...handlers, this.logError);
                         break;
                 }
-                Enemene.log.debug(this.name, `Registering ${pathDefinition.method.padEnd(7)} /api${path}` + (pathDefinition.isPublic ? " (PUBLIC)" : ""));
+                Enemene.log.debug(this.constructor.name, `Registering ${pathDefinition.method.padEnd(7)} /api${path}` + (pathDefinition.isPublic ? " (PUBLIC)" : ""));
                 count++;
             });
         });
-        Enemene.log.info(this.name, `Registered ${count} paths.`);
+        Enemene.log.info(this.constructor.name, `Registered ${count} paths.`);
     }
 
-    private static resolveParameter(req: SecureRequest, res: Response, param: string[]): any {
+    /**
+     * Middleware used to log an error to the logging stream and return the error in a standard format.
+     *
+     * @param err   The error.
+     * @param req   The current request.
+     * @param res   The current response.
+     * @param next  Express next function. __NEEDS TO STAY__ even if not used, because express recognizes this function as error handler only if there are all 4 parameters present!
+     */
+    public async logError(err: RuntimeError, req: SecureRequest, res: Response, next: Function) {
+
+        const statusCode = err.statusCode || 500;
+
+        if ([400, 401, 403, 404].includes(statusCode)) {
+            Enemene.log.info("Access", `${req.payload ? "(" + req.payload.username + ") " : ""}${err.message}`);
+        } else {
+            Enemene.log.error("Access", `${req.payload ? "(" + req.payload.username + ") " : ""}${err.message}`);
+            Enemene.log.error("Access", err.stack);
+        }
+        if (err.toJSON) {
+            return res.status(statusCode).send(err.toJSON());
+        } else {
+            return res.status(statusCode).send(new RuntimeError(err.message).toJSON());
+        }
+
+    }
+
+    private async handle(req: SecureRequest, res: Response, next: Function, pathDefinition: PathDefinition): Promise<void> {
+        const parameterValues: any[] = pathDefinition.parameters.map((param: string[]) => this.resolveParameter(req, res, param));
+        if (!this.controllers[pathDefinition.controller.name]) {
+            Enemene.log.debug(this.constructor.name, `Instantiating ${pathDefinition.controller.name}.`);
+            this.controllers[pathDefinition.controller.name] = new pathDefinition.controller();
+        }
+        const result: any | Redirect = await pathDefinition.fn.apply(this.controllers[pathDefinition.controller.name], parameterValues);
+        if (result instanceof Redirect) {
+            res.redirect(result.url);
+        } else {
+            res.send(result);
+        }
+    }
+
+    private resolveParameter(req: SecureRequest, res: Response, param: string[]): any {
         const [paramType, value] = param;
         let context: Dictionary<string>;
         let parameterValue: any = undefined;
@@ -142,31 +179,5 @@ export class RouterService {
         }
 
         return parameterValue;
-    }
-
-    /**
-     * Middleware used to log an error to the logging stream and return the error in a standard format.
-     *
-     * @param err   The error.
-     * @param req   The current request.
-     * @param res   The current response.
-     * @param next  Express next function. __NEEDS TO STAY__ even if not used, because express recognizes this function as error handler only if there are all 4 parameters present!
-     */
-    public static async logError(err: RuntimeError, req: SecureRequest, res: Response, next: Function) {
-
-        const statusCode = err.statusCode || 500;
-
-        if ([400, 401, 403, 404].includes(statusCode)) {
-            Enemene.log.info("Access", `${req.payload ? "(" + req.payload.username + ") " : ""}${err.message}`);
-        } else {
-            Enemene.log.error("Access", `${req.payload ? "(" + req.payload.username + ") " : ""}${err.message}`);
-            Enemene.log.error("Access", err.stack);
-        }
-        if (err.toJSON) {
-            return res.status(statusCode).send(err.toJSON());
-        } else {
-            return res.status(statusCode).send(new RuntimeError(err.message).toJSON());
-        }
-
     }
 }

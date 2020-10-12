@@ -2,7 +2,8 @@ import * as fs from "fs";
 import * as path from "path";
 import {Sequelize} from "sequelize-typescript";
 import {Enemene} from "../enemene";
-import {Dictionary} from "../../../../base/type/dictionary.type";
+import {UuidService} from "../../../..";
+import {omit} from "lodash";
 
 const YAML = require("yaml");
 
@@ -45,21 +46,22 @@ export class DbImport {
         const content = fs.readFileSync(file, "utf8");
 
         const objects = YAML.parse(content);
-        const creates: Dictionary<object[]> = {};
-        objects.forEach(object => {
-            const model = Object.keys(object)[0];
-            if (!creates[model]) {
-                creates[model] = [];
-            }
-            creates[model].push(Object.values(object)[0] as object);
-        });
+        const creates: any[] = [];
+        if (objects) {
+            objects.forEach(object => {
+                const model = Object.keys(object)[0];
+                const data: any = Object.values(object)[0] as object;
+                if (!data.id) {
+                    data.id = UuidService.getUuid();
+                }
+                data.$model = model;
+                creates.push(data);
+            });
+        }
 
-        const promises = [];
-        Object.keys(creates).forEach(model => {
-            promises.push(this.db.model(model).bulkCreate(creates[model], {transaction: transaction}));
-            Enemene.log.info(this.constructor.name, `Creating ${creates[model].length} objects for ${model}`);
-        });
-
-        await Promise.all(promises);
+        for (const object of creates) {
+            Enemene.log.info(this.constructor.name, `Creating ${object.$model} with ID "${object.id}".`);
+            await this.db.model(object.$model).create(omit(object, "$model"), {transaction: transaction});
+        }
     }
 }

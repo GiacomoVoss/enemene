@@ -1,8 +1,9 @@
 import {PathDefinition} from "../../auth/interface/path-definition.interface";
 import {RequestMethod} from "../enum/request-method.enum";
+import {AbstractController} from "..";
 
 export function Route(path: string, isPublic: boolean, requestMethod: RequestMethod): Function {
-    return function (target: any, key: string, descriptor: PropertyDescriptor): void {
+    return function (target: new () => AbstractController, key: string, descriptor: PropertyDescriptor): void {
         const paths: PathDefinition[] = target.constructor.prototype.$paths || [];
         const parameters = target.constructor.prototype.$parameters || {};
 

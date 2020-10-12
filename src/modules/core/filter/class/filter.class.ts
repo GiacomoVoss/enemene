@@ -51,4 +51,10 @@ export class Filter {
             [field, value]
         );
     }
+
+    public static true(): Filter {
+        return new Filter(
+            "true"
+        );
+    }
 }

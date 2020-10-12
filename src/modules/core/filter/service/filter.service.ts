@@ -52,6 +52,9 @@ export class FilterService {
                 if (filter.args.length) {
                     return FilterService.toSequelizeInternal(filter.args[0], context, includes, filter.parameters[1]);
                 }
+                break;
+            case "true":
+                return {};
         }
         return {};
     }
@@ -68,10 +71,11 @@ export class FilterService {
         if (matches) {
             matches.forEach((match: string) => {
                 const key: string = match.replace(/{([\w\d.]+)}/, "$1");
-                const replacementValue: string | number = get(context, key);
-                if (!replacementValue) {
-                    return null;
+                let replacementValue: string | number = get(context, key, null);
+                if (replacementValue === null) {
+                    replacementValue = "null";
                 }
+
                 result = result.replace(match, replacementValue);
             });
         }
@@ -79,12 +83,16 @@ export class FilterService {
         return result;
     }
 
-    private static replaceContext(value: string | number, context: any): string | number | boolean {
+    private static replaceContext(value: string | number, context: any): string | number | boolean | null {
         if (typeof value !== "string") {
             return value;
         }
 
         let result: any = this.replaceContextAsString(value, context);
+
+        if (result === "null") {
+            return null;
+        }
 
         if (result === "true") {
             return true;

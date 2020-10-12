@@ -1,14 +1,9 @@
 import {Table} from "sequelize-typescript";
 import {snakeCase} from "lodash";
+import {DataObject} from "../data-object.model";
 
-export function Entity(target: Function): void {
+export function Entity(target: new () => DataObject<any>): void {
     Table({
         tableName: snakeCase(target.name),
     })(target);
-}
-
-export function EntityNamed(tableName: string): Function {
-    return Table({
-        tableName: tableName,
-    });
 }

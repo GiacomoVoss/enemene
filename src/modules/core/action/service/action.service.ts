@@ -1,31 +1,33 @@
 import {ObjectNotFoundError} from "../../error/object-not-found.error";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import chalk from "chalk";
-import {Enemene} from "../../../..";
+import {Enemene, View, ViewService} from "../../../..";
 import {AbstractAction} from "../class/abstract-action.class";
 import {ActionParameterType} from "../enum/parameter-type.enum";
 import {ParameterType} from "../../router/enum/parameter-type.enum";
 import {ActionParameterConfiguration} from "../interface/action-parameter-configuration.interface";
+import {ConstructorOf} from "../../../../base/constructor-of";
 
 /**
  * Service for handling views for data manipulation.
  */
 export class ActionService {
 
-    private static ACTIONS: Dictionary<typeof AbstractAction> = {};
+    private viewService: ViewService = Enemene.app.inject(ViewService);
+    private ACTIONS: Dictionary<ConstructorOf<AbstractAction>> = {};
 
     /**
      * Initializes the ActionService by importing all available actions and making them available.
      *
      * @param actions
      */
-    public static async init(actions: Dictionary<typeof AbstractAction>) {
+    public async init(actions: Dictionary<Function>) {
         const length: number = Object.entries(actions).map(([actionName, actionClass]) => {
-            ActionService.addAction(actionName, actionClass);
-            Enemene.log.debug(this.name, `Registering ${chalk.bold(actionName)}`);
+            this.addAction(actionName, actionClass as ConstructorOf<AbstractAction>);
+            Enemene.log.debug(this.constructor.name, `Registering ${chalk.bold(actionName)}`);
             return actionClass;
         }).length;
-        Enemene.log.info(this.name, `Registered ${chalk.bold(length)} actions.`);
+        Enemene.log.info(this.constructor.name, `Registered ${chalk.bold(length)} actions.`);
     }
 
     /**
@@ -34,23 +36,20 @@ export class ActionService {
      * @param name Name of the view.
      * @param actionClass The action's class.
      */
-    public static addAction(name: string, actionClass: typeof AbstractAction): void {
-        if (!ActionService.ACTIONS[name]) {
-            ActionService.ACTIONS[name] = actionClass;
-        }
-    }
-
-    /**
-     * Gets a {@link View} from the view list.
-     *
-     * @param viewName Name of the view.
-     */
-    public static getAction(viewName: string): typeof AbstractAction {
-        if (!ActionService.ACTIONS[viewName]) {
-            return null;
+    public addAction(name: string, actionClass: ConstructorOf<AbstractAction>): void {
+        if (this.ACTIONS[name]) {
+            throw new Error(`Duplicate action name ${chalk.bold(name)}.`);
         }
 
-        return ActionService.ACTIONS[viewName];
+        this.ACTIONS[name] = actionClass;
+        if (actionClass.prototype.$parameters) {
+            Object.entries(actionClass.prototype.$parameters).forEach(([index, parameter]: [string, ActionParameterConfiguration]) => {
+                const view: ConstructorOf<View<any>> | undefined = parameter.config.view as ConstructorOf<View<any>> | undefined;
+                if (view) {
+                    this.viewService.addViewClass(`${name}_${view.name}`, view);
+                }
+            });
+        }
     }
 
     /**
@@ -59,12 +58,12 @@ export class ActionService {
      *
      * @param actionName Name of the view.
      */
-    public static getActionNotNull<T extends typeof AbstractAction>(actionName: string): T {
-        const action: typeof AbstractAction = ActionService.getAction(actionName);
-        if (action === null) {
+    public getActionNotNull<ACTION extends AbstractAction>(actionName: string): ACTION {
+        const actionClass: ConstructorOf<ACTION> = this.ACTIONS[actionName] as ConstructorOf<ACTION>;
+        if (!actionClass) {
             throw new ObjectNotFoundError(actionName);
         }
-        return action as T;
+        return new actionClass();
     }
 
     /**

@@ -1,11 +1,12 @@
 import {UnauthorizedError} from "./error/unauthorized.error";
 import * as bcrypt from "bcrypt";
 import {AuthService} from "./service/auth.service";
-import {Body, Get, Post, RouterModule} from "../router";
+import {Body, Controller, Get, Post} from "../router";
 import {AbstractUser, Enemene} from "../../..";
+import {AbstractController} from "../router/class/abstract-controller.class";
 
-@RouterModule("auth")
-export default class AuthRouter {
+@Controller("auth")
+export default class AuthController extends AbstractController {
 
     @Post("login", true)
     async login(@Body("username") username: string,

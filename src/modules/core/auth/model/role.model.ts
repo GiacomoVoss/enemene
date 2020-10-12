@@ -3,6 +3,7 @@ import {RoutePermission} from "./route-permission.model";
 import {ViewPermission} from "./view-permission.model";
 import {PermissionService} from "../service/permission.service";
 import {AfterCreateHook} from "../../data";
+import {Enemene} from "../../../..";
 
 @Entity
 export class Role extends DataObject<Role> implements AfterCreateHook {
@@ -20,6 +21,6 @@ export class Role extends DataObject<Role> implements AfterCreateHook {
 
 
     async onAfterCreate(): Promise<void> {
-        PermissionService.buildCache();
+        Enemene.app.inject(PermissionService).buildCache();
     }
 }

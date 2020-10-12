@@ -1,6 +1,6 @@
 import {EntityField} from "../interface/entity-field.class";
 import {Dictionary} from "../../../../base/type/dictionary.type";
-import {uniq} from "lodash";
+import {merge, uniq} from "lodash";
 import {DataObject} from "../data-object.model";
 import {ManyToManyField} from "../interface/many-to-many-field.class";
 import {CompositionField} from "../interface/composition-field.class";
@@ -8,7 +8,8 @@ import {CollectionField} from "../interface/collection-field.class";
 import {ReferenceField} from "../interface/reference-field.class";
 import {EntityFieldType} from "../enum/entity-field-type.enum";
 import {EntityModel} from "../type/entity-model.type";
-import {Enemene} from "../../../..";
+import {AbstractUser, DataResponse, DataService, Enemene} from "../../../..";
+import {UnsupportedOperationError} from "../../error/unsupported-operation.error";
 
 export class ModelService {
 
@@ -40,10 +41,7 @@ export class ModelService {
                 let requestedSubFields: string[] = requestedFields
                     .filter((f: string) => f.startsWith(`${key}.`))
                     .map((f: string) => f.substr(f.indexOf(".") + 1));
-                result = {
-                    ...result,
-                    ...this.getModelInternal(field.classGetter().name, requestedSubFields),
-                };
+                result = merge(result, this.getModelInternal(field.classGetter().name, requestedSubFields));
             }
         }
 
@@ -61,5 +59,26 @@ export class ModelService {
         }
         fields.push("id");
         return Object.values(this.getModel(entity, fields)[entity]);
+    }
+
+    public static async getAllowedValues<ENTITY extends DataObject<ENTITY>>(object: ENTITY,
+                                                                            field: keyof ENTITY,
+                                                                            user: AbstractUser): Promise<DataResponse<any[]>> {
+        const fieldModel: EntityField = ModelService.getFields(object.$entity)[field as string];
+        if (fieldModel.isSimpleField || fieldModel instanceof CompositionField) {
+            throw new UnsupportedOperationError();
+        }
+        const allowedValuesMap: Dictionary<Function, keyof ENTITY> = object.$allowedValues;
+        const allowedValuesFn: Function = allowedValuesMap[field];
+        let data: DataObject<any>[];
+        if (allowedValuesFn) {
+            data = await allowedValuesFn.apply(object, user);
+        }
+        const fieldDataEntity: string = (fieldModel as ReferenceField).classGetter().name;
+        const displayPatternFields: string[] = this.getDisplayPatternFields(fieldDataEntity).map((f: EntityField) => f.name);
+        return {
+            data: await Promise.all(data.map((d: DataObject<any>) => DataService.filterFields(d, displayPatternFields))),
+            model: this.getModel(fieldDataEntity, displayPatternFields),
+        };
     }
 }

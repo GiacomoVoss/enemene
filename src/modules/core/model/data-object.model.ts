@@ -12,6 +12,7 @@ export class DataObject<E> extends Model<DataObject<E>> {
 
     $entity = this.constructor.name;
     $displayPattern = "{id}";
+    $allowedValues?: Dictionary<Function, keyof this>;
 
     @Column({
         primaryKey: true,

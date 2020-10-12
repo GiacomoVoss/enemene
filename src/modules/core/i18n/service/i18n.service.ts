@@ -1,13 +1,12 @@
-import {EntityModel} from "../../model/type/entity-model.type";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {serializable} from "../../../../base/type/serializable.type";
 import {Enemene} from "../../../..";
 
 export class I18nService {
 
-    public static parseEntityModel(entityModel: EntityModel, language: string): Dictionary<serializable> {
+    public static parseEntityModel(entityModel: Dictionary<serializable>, language: string): Dictionary<serializable> {
         return Object.keys(entityModel).reduce((result: Dictionary<serializable>, entity: string) => {
-            if (entity === "$root") {
+            if (["$root", "$fields"].includes(entity)) {
                 result[entity] = entityModel[entity];
             } else {
                 result[entity] = {};
