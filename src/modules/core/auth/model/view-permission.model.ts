@@ -15,13 +15,16 @@ export class ViewPermission extends DataObject<ViewPermission> implements AfterC
     @Field("View", EntityFieldType.STRING, true)
     view: string;
 
-    @Field("Berechtigungen", EntityFieldType.STRING, true)
+    @Field("Permissions", EntityFieldType.STRING, true)
     permissions: string;
 
-    @Reference("Rolle", () => Role, false)
+    @Reference("Role", () => Role, false)
     role: Role;
 
     roleId: string;
+
+    @Field("actions", EntityFieldType.STRING_ARRAY)
+    actions: string[];
 
     getPermissions(): Permission[] {
         return this.permissions.split("") as Permission[];

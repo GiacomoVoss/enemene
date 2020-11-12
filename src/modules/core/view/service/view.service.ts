@@ -1,126 +1,211 @@
 import {ViewFieldDefinition} from "..";
 import {ObjectNotFoundError} from "../../error/object-not-found.error";
-import {FindOptions, IncludeOptions} from "sequelize";
+import {FindOptions, IncludeOptions, Op, Transaction, WhereOptions} from "sequelize";
 import {FilterService} from "../../filter/service/filter.service";
 import {EntityField} from "../../model/interface/entity-field.class";
 import {ModelService} from "../../model/service/model.service";
-import {pick} from "lodash";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {AbstractUser} from "../../auth";
 import chalk from "chalk";
-import {DataObject, DataService, Enemene} from "../../../..";
+import {AbstractFilter, DataObject, DataService, Enemene} from "../../../..";
 import {serializable} from "../../../../base/type/serializable.type";
-import {AuthService} from "../../auth/service/auth.service";
 import {ReferenceField} from "../../model/interface/reference-field.class";
 import {CalculatedField} from "../../model/interface/calculated-field.class";
-import {RuntimeError} from "../../application/error/runtime.error";
 import {ConstructorOf} from "../../../../base/constructor-of";
 import {View} from "../class/view.class";
+import {UnsupportedOperationError} from "../../error/unsupported-operation.error";
+import {RequestContext} from "../../router/interface/request-context.interface";
+import {FileService} from "../../file/service/file.service";
+import {ViewDefinition} from "../class/view-definition.class";
 
 /**
  * Service for handling views for data manipulation.
  */
 export class ViewService {
 
+    private fileService: FileService = Enemene.app.inject(FileService);
     private VIEWS: Dictionary<ConstructorOf<View<any>>> = {};
 
     /**
      * Initializes the ViewService by importing all available views and making them available.
-     *
-     * @param views
      */
-    public async init(views: Dictionary<ConstructorOf<View<any>>>) {
-        const length: number = Object.entries(views).map(([viewName, view]) => {
-            this.addViewClass(viewName, view);
-            Enemene.log.debug(this.constructor.name, `Registering ${chalk.bold(viewName)}`);
-            return view;
-        }).length;
-        Enemene.log.info(this.constructor.name, `Registered ${chalk.bold(length)} views.`);
+    public async init() {
+        const viewFiles: string[] = this.fileService.scanForFilePattern(process.cwd(), /.*\.view\.js/);
+        const viewModules: Dictionary<ConstructorOf<View<any>>>[] = await Promise.all(viewFiles.map((filePath: string) => import(filePath)));
+        let count: number = 0;
+        viewModules.forEach((moduleMap: Dictionary<ConstructorOf<View<any>>>) => {
+            Object.values(moduleMap).forEach((module: ConstructorOf<View<any>>) => this.addViewClass(module));
+            count += Object.values(moduleMap).length;
+        });
+        Enemene.log.info(this.constructor.name, `Registered ${chalk.bold(count)} views.`);
     }
 
     /**
      * Add a {@link View} to the view list.
      *
-     * @param name Name of the view.
      * @param viewClass The view.
      */
-    public addViewClass(name: string, viewClass: ConstructorOf<View<any>>): void {
-        console.log(viewClass.prototype.id);
-        if (this.VIEWS[name]) {
-            throw new Error(`Duplicate view ${chalk.bold(name)}`);
+    public addViewClass(viewClass: ConstructorOf<View<any>>): void {
+        if (this.VIEWS[viewClass.name]) {
+            throw new Error(`Duplicate view ${chalk.bold(viewClass.name)}`);
         }
-        this.VIEWS[name] = viewClass;
+        this.validate(viewClass);
+        Enemene.log.debug(this.constructor.name, `Registering view ${chalk.bold(viewClass.name)}.`);
+        this.VIEWS[viewClass.name] = viewClass;
     }
 
-    public async findAll<ENTITY extends DataObject<ENTITY>>(view: View<any>, requestedFields: string[], user: AbstractUser, context: Dictionary<serializable> = {}, additionalFindOptions: FindOptions = {}): Promise<Dictionary<any, keyof ENTITY>[]> {
-        const data: DataObject<ENTITY>[] = await DataService.findAll(view.entity(), this.getFindOptions(view, requestedFields, user, context, additionalFindOptions));
-        return Promise.all(data.map((object: DataObject<ENTITY>) => this.filterFields(object, view, requestedFields)));
+    public async count<ENTITY extends DataObject<ENTITY>>(viewDefinition: ViewDefinition<ENTITY>,
+                                                          context: Dictionary<serializable> = {},
+                                                          additionalFindOptions: FindOptions = {},
+                                                          searchString?: string): Promise<number> {
+        return (await this.findAll(viewDefinition, context, additionalFindOptions, searchString)).length;
     }
 
-    public async filterFields<ENTITY extends DataObject<ENTITY>>(object: ENTITY, view: View<any>, requestedFields: string[]): Promise<Dictionary<any, keyof ENTITY>> {
-        return DataService.filterFields(object, view.getFields(requestedFields));
+    public async findAll<ENTITY extends DataObject<ENTITY>>(viewDefinition: ViewDefinition<ENTITY>,
+                                                            context: Dictionary<serializable> = {},
+                                                            additionalFindOptions: FindOptions = {},
+                                                            searchString?: string): Promise<View<ENTITY>[]> {
+        const data: DataObject<ENTITY>[] = await DataService.findAllRaw(viewDefinition.entity, this.getFindOptions(viewDefinition, context, additionalFindOptions, searchString));
+        return data.map((object: DataObject<ENTITY>) => this.wrap(object, viewDefinition)) as View<ENTITY>[];
     }
 
-    public async findById<ENTITY extends DataObject<ENTITY>>(view: View<any>, id: string, requestedFields: string[], user: AbstractUser, context: Dictionary<serializable> = {}): Promise<Dictionary<any, keyof ENTITY>> {
-        const data: DataObject<ENTITY> = await DataService.findNotNullById(view.entity(), id, this.getFindOptions(view, requestedFields, user, context));
-        return this.filterFields(data, view, requestedFields);
+    public async findAllByView<ENTITY extends DataObject<ENTITY>, VIEW extends View<ENTITY>>(viewClass: ConstructorOf<VIEW>,
+                                                                                             filter?: AbstractFilter): Promise<VIEW[]> {
+        const viewDefinition: ViewDefinition<ENTITY> = viewClass.prototype.$view;
+        const data: DataObject<ENTITY>[] = await DataService.findAllRaw(viewDefinition.entity, {
+            ...FilterService.toSequelize(filter, viewDefinition.entity),
+        });
+        return data.map((object: DataObject<ENTITY>) => this.wrap(object, viewDefinition)) as VIEW[];
     }
 
-    public getRequestedFields(requestedFieldsString?: string): string[] {
-        if (!requestedFieldsString) {
-            return ["*"];
-        } else {
-            return requestedFieldsString.split(",");
+    public async findById<ENTITY extends DataObject<ENTITY>>(viewDefinition: ViewDefinition<ENTITY>,
+                                                             id: string,
+                                                             context: RequestContext<AbstractUser> = {}): Promise<View<ENTITY>> {
+        const data: DataObject<ENTITY> = await DataService.findNotNullById(viewDefinition.entity, id, this.getFindOptions(viewDefinition, context));
+        return this.wrap(data, viewDefinition) as View<ENTITY>;
+    }
+
+    public async save<ENTITY extends DataObject<ENTITY>>(view: View<ENTITY>,
+                                                         context: RequestContext<AbstractUser> = {}): Promise<View<ENTITY>> {
+        const t: Transaction = await Enemene.app.db.transaction();
+        try {
+            const viewDefinition: ViewDefinition<ENTITY> = view.$view;
+            const where: FindOptions = viewDefinition.filter ? FilterService.toSequelize(viewDefinition.filter(context), viewDefinition.entity) : {};
+            const object: DataObject<ENTITY> | null = await DataService.findById(viewDefinition.entity, view.id, where, t);
+            let updatedObject: DataObject<ENTITY>;
+            if (object) {
+                updatedObject = await DataService.update(viewDefinition.entity, object, view.toJSON(), context, t);
+            } else {
+                updatedObject = await DataService.create(viewDefinition.entity, view.toJSON(), context, where, t);
+            }
+            await t.commit();
+            return this.findById(viewDefinition, updatedObject.id, context);
+        } catch (e) {
+            await t.rollback();
+            throw e;
         }
     }
 
-    /**
-     * Gets a {@link View} from the view list.
-     * Throws an {@link ObjectNotFoundError} if it wasn't found.
-     *
-     * @param viewName Name of the view.
-     */
-    public getViewNotNull(viewName: string): View<any> {
+    public getViewDefinition(viewName: string): ViewDefinition<any> {
         if (!this.VIEWS[viewName]) {
             throw new ObjectNotFoundError(viewName);
         }
-        return new this.VIEWS[viewName]();
+        const viewClass = this.VIEWS[viewName];
+
+        return viewClass.prototype.$view;
     }
 
-    public getFindOptions(view: View<any>, requestedFields: string[], user?: AbstractUser, additionalContext: object = {}, additionalFindOptions: FindOptions = {}): FindOptions {
-        const context: any = {
-            ...additionalContext,
-        };
-        if (user) {
-            context.currentUserId = user.id;
-            context.currentUserRoleId = user.roleId;
-            context.user = pick(user, AuthService.INCLUDE_IN_TOKEN);
+    public wrap<ENTITY extends DataObject<ENTITY>>(object: ENTITY, viewDefinition: ViewDefinition<ENTITY>, entity?: string): View<ENTITY> {
+        const view: View<ENTITY> = new viewDefinition.viewClass();
+        const entityFields: Dictionary<EntityField> = ModelService.FIELDS[entity ?? object.$entity];
+        const viewFields: ViewFieldDefinition<ENTITY, any>[] = viewDefinition.fields;
+        for (const viewField of viewFields) {
+            const fieldName: string = viewField.name as string;
+            let entityField: EntityField | undefined = entityFields[fieldName];
+
+            if (entityField) {
+
+                const key: keyof ENTITY = fieldName as keyof ENTITY;
+                let value: any = object[key];
+                if (entityField.isSimpleField) {
+                    view[fieldName] = (object.toJSON ? object.toJSON()?.[key] : object[key]) ?? null;
+                } else {
+                    if (viewField.isCount) {
+                        view[fieldName] = (value ?? []).length;
+                    } else if (viewField.isArray) {
+                        value = value as any[];
+                        view[fieldName] = (value ?? []).map((subValue: any) => {
+                            if (viewField.fieldType.name === "String") {
+                                return typeof subValue === "string" ? subValue : subValue.id;
+                            } else if (viewField.subView) {
+                                const subViewDefinition: ViewDefinition<any> = viewField.subView.prototype.$view;
+                                return this.wrap(subValue as unknown as DataObject<ENTITY>, subViewDefinition, subViewDefinition.entity.name) as any;
+                            } else {
+                                return null;
+                            }
+                        });
+                    } else if (value !== null && value !== undefined) {
+                        if (viewField.fieldType.name === "String") {
+                            view[fieldName] = typeof value === "string" ? value : value.id;
+                        } else if (viewField.subView) {
+                            const subViewDefinition: ViewDefinition<any> = viewField.subView.prototype.$view;
+                            view[fieldName] = this.wrap(value as unknown as DataObject<ENTITY>, subViewDefinition, subViewDefinition.entity.name) as any;
+                        } else {
+                            view[fieldName] = null;
+                        }
+                    } else {
+                        view[fieldName] = null;
+                    }
+                }
+            }
         }
 
-        let find: FindOptions = additionalFindOptions;
-        if (view.filter) {
-            const filterOptions: FindOptions = FilterService.toSequelize(view.filter, context);
+        view.id = object.id;
+        view.$displayPattern = object.$displayPattern;
+
+        return view;
+    }
+
+    public getFindOptions(viewDefinition: ViewDefinition<any>,
+                          context: RequestContext<AbstractUser> = {},
+                          additionalFindOptions: FindOptions = {},
+                          searchString?: string): FindOptions {
+        let find: FindOptions = {...additionalFindOptions};
+        if (viewDefinition.filter) {
+            const filterOptions: FindOptions = FilterService.toSequelize(viewDefinition.filter(context), viewDefinition.entity);
             find.include = [
                 ...(find.include ?? []),
                 ...(filterOptions.include ?? []),
             ];
             find.where = {
-                ...(find.where ?? {}),
-                ...(filterOptions.where ?? {}),
+                [Op.and]: {
+                    ...(find.where ?? {}),
+                    ...(filterOptions.where ?? {}),
+                }
             };
         }
 
-        find.order = additionalFindOptions.order ?? view.defaultOrder;
-        find.limit = additionalFindOptions.limit;
-        find.offset = additionalFindOptions.offset;
-        find.include = additionalFindOptions.include ?? [];
-        this.addIncludeAndAttributes(view.entity().name, view.$fields, find);
+        find.order = find.order ?? viewDefinition.defaultOrder;
+
+        if (viewDefinition.searchAttributes && searchString) {
+            find.where = {
+                ...find.where,
+                [Op.or]: viewDefinition.searchAttributes.reduce((result: WhereOptions, attribute: string) => {
+                    result[attribute] = {
+                        [Op.like]: `%${searchString}%`,
+                    };
+                    return result;
+                }, {})
+            };
+        }
+
+        this.addIncludeAndAttributes(viewDefinition.entity.name, viewDefinition.fields, find);
 
         return find;
     }
 
 
-    public addIncludeAndAttributes(entity: string, fields: ViewFieldDefinition<any>[], findOptions: FindOptions = {}): void {
+    public addIncludeAndAttributes(entity: string, fields: ViewFieldDefinition<any, any>[], findOptions: FindOptions = {}): void {
         const model = ModelService.getFields(entity);
         if (!findOptions.attributes) {
             findOptions.attributes = ["id"];
@@ -129,34 +214,64 @@ export class ViewService {
             findOptions.include = [];
         }
         for (const field of fields) {
-            let fieldName: string = field.name;
-            if (fieldName.includes("$count")) {
-                fieldName = fieldName.replace(".$count", "");
-            }
+            let fieldName: string = field.name as string;
 
-            const entityField: EntityField = model[fieldName];
+            let entityField: EntityField = model[fieldName];
             if (!entityField) {
-                throw new RuntimeError(`Unknown field "${fieldName}".`);
+                fieldName = fieldName.substr(0, fieldName.indexOf(".$count"));
+                entityField = model[fieldName];
+            }
+            if (!entityField) {
+                throw new UnsupportedOperationError(`Unknown field ${chalk.bold(fieldName)} in entity ${chalk.bold(entity)}.`);
             }
             if (entityField.isSimpleField || entityField instanceof CalculatedField) {
                 (findOptions.attributes as string[]).push(fieldName);
                 if (entityField instanceof CalculatedField) {
-                    this.addIncludeAndAttributes(entity, entityField.includeFields.map(f => new ViewFieldDefinition<any>(f, 0)), findOptions);
+                    const includes: ViewFieldDefinition<any, any>[] = entityField.includeFields
+                        .filter((f: string) => !f.includes("."))
+                        .map(f => new ViewFieldDefinition<any, any>(f as any, 0));
+                    this.addIncludeAndAttributes(entity, includes, findOptions);
                 }
             } else {
                 const include: IncludeOptions = {model: (entityField as ReferenceField).classGetter(), as: fieldName, required: false};
                 if (field.subView) {
-                    const subView: View<any> = new field.subView();
+                    const viewDefinition: ViewDefinition<any> = field.subView.prototype.$view;
                     this.addIncludeAndAttributes(
-                        subView.entity().name,
-                        subView.$fields,
+                        viewDefinition.entity.name,
+                        viewDefinition.fields,
                         include,
                     );
+                } else if (field.isCount) {
+                    include.attributes = ["id"];
                 } else {
                     include.attributes = ModelService.getDisplayPatternFields((entityField as ReferenceField).classGetter().name).map((ef: EntityField) => ef.name);
                 }
                 findOptions.include.push(include);
             }
         }
+    }
+
+    private validate(viewClass: ConstructorOf<View<any>>): void {
+        const viewDefinition: ViewDefinition<any> = viewClass.prototype.$view;
+        const entityFields: Dictionary<EntityField> = ModelService.getFields(viewDefinition.entity.name);
+        for (const viewField of viewDefinition.fields) {
+            const name: string = viewField.name;
+            if (!entityFields[name]) {
+                throw new Error(`Error validating ${chalk.underline(viewClass.name)}: Field ${chalk.bold(name)} does not exist in entity ${chalk.bold(viewDefinition.entity.name)}.`);
+            }
+        }
+    }
+
+    public getSelectionViewDefinition<ENTITY extends DataObject<ENTITY>>(entity: ConstructorOf<ENTITY>): ViewDefinition<ENTITY> {
+        return new ViewDefinition(
+            entity,
+            class SelectionView extends View<ENTITY> {
+                public $view: any = {
+                    entity: entity.name,
+                };
+            },
+            ModelService.getDisplayPatternFields(entity.name)
+                .map((entityField: EntityField) => new ViewFieldDefinition(entityField.name as any, 0, {name: "String"}))
+        );
     }
 }

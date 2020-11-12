@@ -4,14 +4,14 @@
   "description": "An opinionated approach to a powerful and easy to handle express web server.",
   "repository": "http://github.com/GiacomoVoss/enemene",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && rm -rf lib/types && cp -R src/types lib/types && cp src/enemene.d.ts lib/enemene.d.ts",
     "prepare": "npm run build",
     "cli": "npm run build && node lib/cli/index.js",
     "version": "git add -A src",
     "postversion": "git push && git push --tags"
   },
   "main": "lib/index.js",
-  "types": "lib/types/index.d.ts",
+  "types": "lib/enemene.d.ts",
   "files": [
     "lib/**/*"
   ],

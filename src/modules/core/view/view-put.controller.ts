@@ -1,47 +1,32 @@
-import {Body, Context, Controller, CurrentUser, Path, Put} from "../router";
-import {ViewService} from "./service/view.service";
-import {DataResponse, DataService} from "../data";
+import {Body, Context, Path, Put} from "../router";
 import {DataObject} from "../model";
 import {AbstractUser} from "../auth";
-import {RequestMethod} from "../router/enum/request-method.enum";
+import {DataResponse, View} from "../../..";
 import {Dictionary} from "../../../base/type/dictionary.type";
-import {pick} from "lodash";
 import {uuid} from "../../../base/type/uuid.type";
 import {serializable} from "../../../base/type/serializable.type";
-import {PermissionService} from "../auth/service/permission.service";
-import {FindOptions} from "sequelize";
-import {Enemene} from "../../..";
-import {AbstractController} from "../router/class/abstract-controller.class";
-import {View} from "./class/view.class";
+import {AbstractViewController} from "./abstract-view-controller";
+import {RequestMethod} from "../router/enum/request-method.enum";
+import {RequestContext} from "../router/interface/request-context.interface";
+import {Controller} from "../router/decorator/controller.decorator";
+import {ViewDefinition} from "./class/view-definition.class";
 
 @Controller("view")
-export default class ViewPutController extends AbstractController {
-
-    private viewService: ViewService = Enemene.app.inject(ViewService);
-
-    getView<ENTITY extends DataObject<ENTITY>>(viewName: string, user: AbstractUser): View<ENTITY> {
-        Enemene.app.inject(PermissionService).checkViewPermission(viewName, RequestMethod.PUT, user);
-        return this.viewService.getViewNotNull(viewName);
-    }
+export default class ViewPutController extends AbstractViewController {
 
     @Put("/:view/:id", true)
-    async updateObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
-                                                          @Path("view") viewName: string,
+    async updateObject<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
                                                           @Path("id") objectId: uuid,
                                                           @Body() data: Dictionary<serializable>,
-                                                          @Context() context: Dictionary<serializable>): Promise<DataResponse<ENTITY>> {
-        const view: View<ENTITY> = this.getView(viewName, user);
-        const viewFindOptions: FindOptions = this.viewService.getFindOptions(view, ["*"], user, context);
+                                                          @Context() context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
+        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.PUT, context);
+        const view: View<ENTITY> = await this.viewService.findById(viewDefinition, objectId, context);
+        view.setValues(data);
 
-        let object: DataObject<ENTITY> = await DataService.findNotNullById(view.entity(), objectId, {where: viewFindOptions.where});
-
-        const fields: string[] = view.getFields();
-        const filteredData: Dictionary<serializable> = pick(data, fields);
-
-        await DataService.update(view.entity(), object, filteredData);
         return {
-            data: await this.viewService.findById(view, objectId, ["*"], user, context),
-            model: view.getModel(),
+            data: await this.viewService.save(view, context),
+            model: viewDefinition.getModel(),
         };
     }
+
 }

@@ -1,5 +1,6 @@
 import {LogLevel} from "../../log";
 import {AbstractUser} from "../../auth";
+import {uuid} from "../../../../base/type/uuid.type";
 
 export interface EnemeneConfig {
     /**
@@ -66,6 +67,8 @@ export interface EnemeneConfig {
     userModel: typeof AbstractUser;
 
     languages?: string[];
+
+    developerRoleId?: uuid;
 
     /**
      * This can contain 2 possible values:

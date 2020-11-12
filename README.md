@@ -28,7 +28,9 @@ Enemene.create(config)              // Create new server
 ## Concepts
 
 ### Entities
-Entities are the definition of models. You can create them by executing `enemene mentity` on the command line.
+Entities are the definition of models. You can create them by executing `enemene mentity` on the command line. Aannotate a class property 
+with `@Field`, `@Reference`, `@Collection` or `@Composition` to create a field.. To add a calculated attribute that gets evaluated on-the
+-fly, annotate a class method with `@Calculated`.
 
 ### Views
 Views are an abstraction of entities to define the access to them without writing any imperative code. A view is defined with an entity 
@@ -38,11 +40,11 @@ Views are an abstraction of entities to define the access to them without writin
    Additionally, you can limit the objects accessible by the view by providing a filter (see "Filters").
 You can create a rudimentary view by executing `enemene miew` on the command line.
 
-### Routes
-If a simple data access layer does not suffice, you can define custom router modules that provide custom routes. Here is an example:
+### Controllers
+If a simple data access layer does not suffice, you can define custom controllers that provide custom routes. Here is an example:
 ````
-@RouterModule("example")
-export class ExampleRouter {
+@Controller("example")
+export class ExampleController extends AbstractController {
 
     @Get("/:id")
     async getStuff(@Path("id") id: string, 

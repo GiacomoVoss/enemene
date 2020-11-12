@@ -10,8 +10,8 @@ import {Dictionary} from "../../../base/type/dictionary.type";
 })
 export class DataObject<E> extends Model<DataObject<E>> {
 
-    $entity = this.constructor.name;
-    $displayPattern = "{id}";
+    $entity: string;
+    $displayPattern: string = "{id}";
     $allowedValues?: Dictionary<Function, keyof this>;
 
     @Column({
@@ -24,7 +24,11 @@ export class DataObject<E> extends Model<DataObject<E>> {
     }
 
     toJSON(): any {
-        return super.toJSON();
+        return {
+            ...super.toJSON(),
+            $displayPattern: this.$displayPattern,
+            $entity: this.$entity,
+        };
         // function unfold(value) {
         //     if (value == null) {
         //         return null;

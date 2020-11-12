@@ -10,7 +10,8 @@ import path from "path";
 const templates: Record<string, string> = {view, entity};
 
 export async function getModels(): Promise<Dictionary<string>> {
-    return FileService.scanForFilePattern(path.join(process.cwd(), "src"), /.*\.model\.ts$/).reduce((map: Dictionary<string>, fileName: string) => {
+    const fileService: FileService = new FileService();
+    return fileService.scanForFilePattern(path.join(process.cwd(), "src"), /.*\.model\.ts$/).reduce((map: Dictionary<string>, fileName: string) => {
         const modelName: string = getModelNameFromFile(fileName);
         map[modelName] = fileName;
         return map;

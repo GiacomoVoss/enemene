@@ -7,19 +7,10 @@ export class FileService {
      * Copies a file from one destination path to the other.
      * @param from      Source path.
      * @param to        Destination path.
-     * @param exact     The given paths are exact and don't need to be prefixed.
      */
-    public static copyFile(from: string, to: string, exact: boolean = false) {
-        let source;
-        let dest;
-        if (exact) {
-            source = fs.createReadStream(from);
-            dest = fs.createWriteStream(to);
-        } else {
-            source = fs.createReadStream(from);
-            dest = fs.createWriteStream(to);
-
-        }
+    public copyFile(from: string, to: string) {
+        let source = fs.createReadStream(from);
+        let dest = fs.createWriteStream(to);
 
         return new Promise((resolve, reject) => {
             source.on("end", resolve);
@@ -32,7 +23,7 @@ export class FileService {
      * Delets a file at the given path.
      * @param filePath
      */
-    public static deleteFile(filePath): void {
+    public deleteFile(filePath): void {
         fs.unlinkSync(filePath);
     }
 
@@ -41,7 +32,7 @@ export class FileService {
      * @param filePath
      * @return boolean if the file exists.
      */
-    public static fileExists(filePath: string): boolean {
+    public fileExists(filePath: string): boolean {
         return fs.existsSync(filePath);
     }
 
@@ -50,7 +41,7 @@ export class FileService {
      *
      * @param fileName  The filename to split.
      */
-    public static splitFileName(fileName: string): [string, string] {
+    public splitFileName(fileName: string): [string, string] {
         const fileNameArr: string[] = fileName.split(".");
         const extension: string = fileNameArr.pop();
         const name: string = fileNameArr.join(".");
@@ -63,11 +54,11 @@ export class FileService {
      * @param dir       Directory to search in.
      * @param pattern   File pattern to look for.
      */
-    public static scanForFilePattern(dir: string, pattern: RegExp): string[] {
+    public scanForFilePattern(dir: string, pattern: RegExp): string[] {
         return fs.readdirSync(dir).map(file => {
             const fullPath: string = path.join(dir, file);
             if (fs.lstatSync(fullPath).isDirectory()) {
-                return FileService.scanForFilePattern(fullPath, pattern);
+                return this.scanForFilePattern(fullPath, pattern);
             } else {
                 if (file.match(pattern)) {
                     return [fullPath];

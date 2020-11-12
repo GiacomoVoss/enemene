@@ -1,15 +1,15 @@
-import {PathDefinition} from "../../auth/interface/path-definition.interface";
 import {View, ViewFieldDefinition} from "..";
-import {ConstructorOf} from "../../../../base/constructor-of";
 import {DataObject} from "../../model";
+import {ConstructorOf} from "../../../../base/constructor-of";
 
-export function ViewField<ENTITY extends DataObject<ENTITY>>(position: number, subView?: ConstructorOf<View<any>>): Function {
-    return function (target: new () => View<ENTITY>, key: keyof View<ENTITY>, descriptor: PropertyDescriptor): void {
-        const fields: PathDefinition[] = target.constructor.prototype.$fields || [];
 
+export function ViewField<ENTITY extends DataObject<ENTITY>, SUBENTITY extends DataObject<SUBENTITY>, SUBVIEW extends View<SUBENTITY>>(position: number, subView?: ConstructorOf<SUBVIEW>, count: boolean = false): Function {
+    return function (target: new () => View<ENTITY>, key: keyof ENTITY): void {
+        const fields: ViewFieldDefinition<ENTITY, SUBENTITY>[] = target.constructor.prototype.$fields ?? [];
+        const fieldType = Reflect.getMetadata("design:type", target, key as string);
         target.constructor.prototype.$fields = [
             ...fields,
-            new ViewFieldDefinition(key, position, subView),
+            new ViewFieldDefinition<ENTITY, SUBENTITY>(key as keyof View<ENTITY>, position, fieldType, subView, fieldType.name === "Array", count),
         ];
     };
 }

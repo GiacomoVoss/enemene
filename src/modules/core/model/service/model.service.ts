@@ -10,6 +10,7 @@ import {EntityFieldType} from "../enum/entity-field-type.enum";
 import {EntityModel} from "../type/entity-model.type";
 import {AbstractUser, DataResponse, DataService, Enemene} from "../../../..";
 import {UnsupportedOperationError} from "../../error/unsupported-operation.error";
+import {RequestContext} from "../../router/interface/request-context.interface";
 
 export class ModelService {
 
@@ -61,23 +62,25 @@ export class ModelService {
         return Object.values(this.getModel(entity, fields)[entity]);
     }
 
-    public static async getAllowedValues<ENTITY extends DataObject<ENTITY>>(object: ENTITY,
-                                                                            field: keyof ENTITY,
-                                                                            user: AbstractUser): Promise<DataResponse<any[]>> {
+    public static async getAllowedValues<ENTITY extends DataObject<ENTITY>, SUBENTITY extends DataObject<SUBENTITY>>(object: ENTITY,
+                                                                                                                     field: keyof ENTITY,
+                                                                                                                     context: RequestContext<AbstractUser>): Promise<DataResponse<SUBENTITY[]>> {
         const fieldModel: EntityField = ModelService.getFields(object.$entity)[field as string];
         if (fieldModel.isSimpleField || fieldModel instanceof CompositionField) {
-            throw new UnsupportedOperationError();
+            throw new UnsupportedOperationError("Cannot get allowed values for simple or composition fields");
         }
         const allowedValuesMap: Dictionary<Function, keyof ENTITY> = object.$allowedValues;
         const allowedValuesFn: Function = allowedValuesMap[field];
         let data: DataObject<any>[];
         if (allowedValuesFn) {
-            data = await allowedValuesFn.apply(object, user);
+            data = await allowedValuesFn.apply(object, [context]);
+        } else {
+            data = await DataService.findAllRaw((fieldModel as ReferenceField).classGetter());
         }
         const fieldDataEntity: string = (fieldModel as ReferenceField).classGetter().name;
         const displayPatternFields: string[] = this.getDisplayPatternFields(fieldDataEntity).map((f: EntityField) => f.name);
         return {
-            data: await Promise.all(data.map((d: DataObject<any>) => DataService.filterFields(d, displayPatternFields))),
+            data,
             model: this.getModel(fieldDataEntity, displayPatternFields),
         };
     }

@@ -1,186 +1,156 @@
-import {Context, Controller, CurrentUser, Get, Path, Query} from "../router";
+import {Context, Get, Path, Query} from "../router";
 import {AbstractUser} from "../auth";
-import {ViewService} from "./service/view.service";
 import {DataResponse, DataService} from "../data";
 import {DataObject} from "../model";
 import {RequestMethod} from "../router/enum/request-method.enum";
 import {ViewFieldDefinition} from "./";
-import {UnauthorizedError} from "../auth/error/unauthorized.error";
 import {Dictionary} from "../../../base/type/dictionary.type";
-import {uuid} from "../../../base/type/uuid.type";
 import {serializable} from "../../../base/type/serializable.type";
-import {PermissionService} from "../auth/service/permission.service";
 import {ObjectNotFoundError} from "../error/object-not-found.error";
 import {Header, HttpHeader} from "../router/decorator/parameter/header.decorator";
-import {FindOptions, Op, WhereOptions} from "sequelize";
-import {Enemene} from "../../..";
-import {AbstractController} from "../router/class/abstract-controller.class";
 import {ModelService} from "../model/service/model.service";
 import {View} from "./class/view.class";
+import {AbstractViewController} from "./abstract-view-controller";
+import {ReferenceField} from "../model/interface/reference-field.class";
+import {UnsupportedOperationError} from "../error/unsupported-operation.error";
+import {RequestContext} from "../router/interface/request-context.interface";
+import {Controller} from "../router/decorator/controller.decorator";
+import {ViewDefinition} from "./class/view-definition.class";
 
 @Controller("view")
-export default class ViewGetController extends AbstractController {
-
-    private viewService: ViewService = Enemene.app.inject(ViewService);
-
-    getView<ENTITY extends DataObject<ENTITY>>(viewName: string, user: AbstractUser): View<ENTITY> {
-        Enemene.app.inject(PermissionService).checkViewPermission(viewName, RequestMethod.GET, user);
-        return this.viewService.getViewNotNull(viewName);
-    }
+export default class ViewGetController extends AbstractViewController {
 
     @Get("/count/:view", true)
-    async countObjects<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
-                                                          @Path("view") viewName: string,
+    async countObjects<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
                                                           @Query("search") search: string,
-                                                          @Context() context: Dictionary<serializable>): Promise<object> {
-        const view: View<ENTITY> = this.getView(viewName, user);
-        const findOptions: FindOptions = {};
-        if (view.searchAttributes && search) {
-            findOptions.where = {
-                ...(findOptions.where ?? {}),
-                [Op.or]: view.searchAttributes.reduce((result: WhereOptions, attribute: string) => {
-                    result[attribute] = {
-                        [Op.like]: `%${search}%`,
-                    };
-                    return result;
-                }, {})
-            };
-        }
+                                                          @Context() context: RequestContext<AbstractUser>): Promise<object> {
+        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.GET, context);
 
         return {
             data: {
-                count: await DataService.count(view.entity(), this.viewService.getFindOptions(view, ["id"], user, context, findOptions))
+                count: await this.viewService.count(viewDefinition, context),
             },
         };
     }
 
     @Get("/:view", true)
-    async getObjects<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
-                                                        @Path("view") viewName: string,
+    async getObjects<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
                                                         @Query("fields") requestedFields: string,
                                                         @Query("order") order: string,
                                                         @Query("limit") limit: string,
                                                         @Query("offset") offset: string,
                                                         @Query("search") search: string,
-                                                        @Context() context: Dictionary<serializable>,
+                                                        @Context() context: RequestContext<AbstractUser>,
                                                         @Header(HttpHeader.LANGUAGE) language: string): Promise<DataResponse<ENTITY>> {
-        const view: View<ENTITY> = this.getView(viewName, user);
-
-        const findOptions: FindOptions = DataService.getFindOptions(order, limit, offset);
-        if (view.searchAttributes && search) {
-            findOptions.where = {
-                ...(findOptions.where ?? {}),
-                [Op.or]: view.searchAttributes.reduce((result: WhereOptions, attribute: string) => {
-                    result[attribute] = {
-                        [Op.like]: `%${search}%`,
-                    };
-                    return result;
-                }, {})
-            };
-        }
+        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.GET, context);
         return {
-            data: await this.viewService.findAll(view, this.viewService.getRequestedFields(requestedFields ?? "*"), user, context, findOptions),
-            model: view.getModel(language),
-            actions: view.getActionConfigurations(),
+            data: await this.viewService.findAll(viewDefinition, context, DataService.getFindOptions(order, limit, offset), search),
+            model: viewDefinition.getModel(language),
+            actions: viewDefinition.getActionConfigurations(),
         };
     }
 
     @Get("/:view/:id", true)
-    async getObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
-                                                       @Path("view") viewName: string,
+    async getObject<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
                                                        @Path("id") objectId: string,
                                                        @Query("fields") requestedFields: string,
-                                                       @Context() context: Dictionary<serializable>): Promise<DataResponse<ENTITY>> {
-        const view: View<ENTITY> = this.getView(viewName, user);
+                                                       @Context() context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
+        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.GET, context);
         return {
-            data: await this.viewService.findById(view, objectId, this.viewService.getRequestedFields(requestedFields), user, context),
-            model: view.getModel(),
-            actions: view.getActionConfigurations(),
+            data: await this.viewService.findById(viewDefinition, objectId, context),
+            model: viewDefinition.getModel(),
+            actions: viewDefinition.getActionConfigurations(),
         };
     }
 
     @Get("/:view/:id/:attribute", true)
-    async getCollection<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
-                                                           @Path("view") viewName: string,
+    async getCollection<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
                                                            @Path("id") objectId: string,
-                                                           @Path("attribute") collectionField: keyof ENTITY,
+                                                           @Path("attribute") collectionField: keyof View<ENTITY>,
                                                            @Query("fields") requestedFields: string,
                                                            @Context() context: Dictionary<serializable>): Promise<DataResponse<any>> {
-        const baseView: View<ENTITY> = this.getView(viewName, user);
-        if (!baseView.$fields.find(field => field.name === collectionField)) {
+        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.GET, context);
+        if (!viewDefinition.fields.find(field => field.name === collectionField)) {
             throw new ObjectNotFoundError();
         }
 
-        const fields: string[] = baseView.getFields(this.viewService.getRequestedFields(requestedFields));
-        const model = baseView.getModel();
+        const view: View<ENTITY> = await this.viewService.findById(viewDefinition, objectId, context);
 
-        let subFields: string[] = fields.filter(field => field.startsWith(`${String(collectionField)}.`));
-        const data: DataObject<ENTITY> = await DataService.findNotNullById(baseView.entity(), objectId, this.viewService.getFindOptions(baseView, [collectionField as string], user, context));
-
-        const subData: Partial<ENTITY> = await DataService.filterFields(data, subFields) as Partial<ENTITY>;
         return {
-            data: subData[collectionField],
-            model,
+            data: view[collectionField] as any,
+            model: viewDefinition.getModel(),
         };
     }
 
-    @Get("/:view/:id/:attribute/:subId", true)
-    async getCollectionObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
-                                                                 @Path("view") viewName: string,
-                                                                 @Path("id") objectId: uuid,
-                                                                 @Path("attribute") collectionField: keyof ENTITY,
-                                                                 @Path("subId") subObjectId: uuid,
-                                                                 @Query("fields") requestedFields: string,
-                                                                 @Context() context: Dictionary<serializable>): Promise<DataResponse<any>> {
-        const baseView: View<ENTITY> = this.getView(viewName, user);
-
-        if (!baseView.$fields.find(field => field.name === collectionField)) {
-            throw new UnauthorizedError();
-        }
-
-        const fields = this.viewService.getRequestedFields(requestedFields).map((field: string) => `${collectionField}.${field}`);
-
-        const data: DataObject<ENTITY> = await DataService.findNotNullById(baseView.entity(), objectId, this.viewService.getFindOptions(baseView, fields, user, context));
-        const model = baseView.getModel();
-
-        const subData: Dictionary<any, keyof ENTITY> = await DataService.filterFields(data, fields);
-
-        let subObject: DataObject<any>;
-        if (Array.isArray(subData[collectionField])) {
-            subObject = (subData[collectionField] as DataObject<any>[]).find(object => object.id === subObjectId);
-        } else {
-            subObject = (subData[collectionField] as DataObject<any>).id === subObjectId ? subData[collectionField] : null;
-        }
-
-        return {
-            data: subObject,
-            model,
-        };
-    }
+    //
+    // @Get("/:view/:id/:attribute/:subId", true)
+    // async getCollectionObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
+    //                                                              @Path("view") viewName: string,
+    //                                                              @Path("id") objectId: uuid,
+    //                                                              @Path("attribute") collectionField: keyof ENTITY,
+    //                                                              @Path("subId") subObjectId: uuid,
+    //                                                              @Query("fields") requestedFields: string,
+    //                                                              @Context() context: Dictionary<serializable>): Promise<DataResponse<any>> {
+    //     const baseView: View<ENTITY> = this.getViewDefinition(viewName, user);
+    //
+    //     if (!baseView.$fields.find(field => field.name === collectionField)) {
+    //         throw new UnauthorizedError();
+    //     }
+    //
+    //     const fields = this.viewService.getRequestedFields(requestedFields).map((field: string) => `${collectionField}.${field}`);
+    //
+    //     const data: DataObject<ENTITY> = await DataService.findNotNullById(baseView.entity(), objectId, this.viewService.getFindOptions(baseView, fields, user, context));
+    //     const model = baseView.getModel();
+    //
+    //     const subData: Dictionary<any, keyof ENTITY> = await DataService.filterFields(data, fields);
+    //
+    //     let subObject: DataObject<any>;
+    //     if (Array.isArray(subData[collectionField])) {
+    //         subObject = (subData[collectionField] as DataObject<any>[]).find(object => object.id === subObjectId);
+    //     } else {
+    //         subObject = (subData[collectionField] as DataObject<any>).id === subObjectId ? subData[collectionField] : null;
+    //     }
+    //
+    //     return {
+    //         data: subObject,
+    //         model,
+    //     };
+    // }
 
     @Get("/model/:view", true)
-    async getViewModel(@CurrentUser user: AbstractUser,
+    async getViewModel(@Context() context: RequestContext<AbstractUser>,
                        @Path("view") viewName: string): Promise<Dictionary<serializable>> {
-        const view: View<any> = this.getView(viewName, user);
-        return view.getModel();
+        const viewDefinition: ViewDefinition<any> = this.getViewDefinition(viewName, RequestMethod.GET, context);
+        return viewDefinition.getModel();
     }
 
     @Get("/allowedValues/:view/:attribute", true)
-    async getAllowedValuesForObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
-                                                                       @Path("view") viewName: string,
-                                                                       @Path("attribute") collectionField: keyof ENTITY,
-                                                                       @Context() context: Dictionary<serializable>): Promise<DataResponse<any>> {
-        const baseView: View<ENTITY> = this.getView(viewName, user);
+    async getAllowedValues<ENTITY extends DataObject<ENTITY>, SUBENTITY extends DataObject<SUBENTITY>>(@Path("view") viewName: string,
+                                                                                                       @Path("attribute") collectionField: keyof ENTITY,
+                                                                                                       @Context() context: RequestContext<AbstractUser>): Promise<DataResponse<any>> {
 
-        const collectionViewField: ViewFieldDefinition<ENTITY> | undefined = baseView.$fields
-            .find((field: ViewFieldDefinition<ENTITY>) => field.name === collectionField);
+        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.GET, context);
+
+        const collectionViewField: ViewFieldDefinition<ENTITY, SUBENTITY> | undefined = viewDefinition.fields
+            .find((field: ViewFieldDefinition<ENTITY, SUBENTITY>) => field.name === collectionField);
 
         if (!collectionViewField) {
             throw new ObjectNotFoundError();
         }
 
-        const object: ENTITY = new (baseView.entity())();
+        const entityField: ReferenceField = ModelService.getFields(viewDefinition.entity.name)[collectionField as string];
 
-        return ModelService.getAllowedValues(object, collectionViewField.name as keyof ENTITY, user);
+        if (!(entityField instanceof ReferenceField)) {
+            throw new UnsupportedOperationError("Cannot get allowed values.");
+        }
+
+        const object: ENTITY = new (viewDefinition.entity)();
+
+        const allowedValues: DataResponse<SUBENTITY[]> = await ModelService.getAllowedValues(object, collectionViewField.name as keyof ENTITY, context);
+        const subViewDefinition: ViewDefinition<SUBENTITY> = this.viewService.getSelectionViewDefinition(entityField.classGetter());
+        return {
+            data: allowedValues.data.map((o: SUBENTITY) => this.viewService.wrap(o, subViewDefinition)),
+            model: allowedValues.model,
+        };
     }
 }

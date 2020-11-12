@@ -1,9 +1,10 @@
 import {UnauthorizedError} from "./error/unauthorized.error";
 import * as bcrypt from "bcrypt";
 import {AuthService} from "./service/auth.service";
-import {Body, Controller, Get, Post} from "../router";
+import {Body, Get, Post} from "../router";
 import {AbstractUser, Enemene} from "../../..";
 import {AbstractController} from "../router/class/abstract-controller.class";
+import {Controller} from "../router/decorator/controller.decorator";
 
 @Controller("auth")
 export default class AuthController extends AbstractController {

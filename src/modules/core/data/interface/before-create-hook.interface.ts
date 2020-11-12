@@ -1,3 +1,6 @@
+import {RequestContext} from "../../router/interface/request-context.interface";
+import {AbstractUser} from "../../auth";
+
 export interface BeforeCreateHook {
-    onBeforeCreate(): Promise<void>;
+    onBeforeCreate(context: RequestContext<AbstractUser>): Promise<void>;
 }

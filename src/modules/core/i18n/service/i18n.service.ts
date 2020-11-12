@@ -6,7 +6,7 @@ export class I18nService {
 
     public static parseEntityModel(entityModel: Dictionary<serializable>, language: string): Dictionary<serializable> {
         return Object.keys(entityModel).reduce((result: Dictionary<serializable>, entity: string) => {
-            if (["$root", "$fields"].includes(entity)) {
+            if (entity.startsWith("$")) {
                 result[entity] = entityModel[entity];
             } else {
                 result[entity] = {};

@@ -1,64 +1,49 @@
-import {Context, Controller, CurrentUser, Delete, Path} from "../router";
-import {ViewService} from "./service/view.service";
-import {DataService} from "../data";
+import {Context, Delete, Path} from "../router";
+import {AbstractViewController} from "./abstract-view-controller";
 import {DataObject} from "../model";
 import {AbstractUser} from "../auth";
-import {RequestMethod} from "../router/enum/request-method.enum";
 import {uuid} from "../../../base/type/uuid.type";
-import {Dictionary} from "../../../base/type/dictionary.type";
-import {serializable} from "../../../base/type/serializable.type";
-import {PermissionService} from "../auth/service/permission.service";
-import {ObjectNotFoundError} from "../error/object-not-found.error";
-import {EntityField} from "../model/interface/entity-field.class";
-import {ModelService} from "../model/service/model.service";
-import {RuntimeError} from "../application/error/runtime.error";
-import {ReferenceField} from "../model/interface/reference-field.class";
-import {Enemene} from "../../..";
-import {AbstractController} from "../router/class/abstract-controller.class";
-import {View} from "./class/view.class";
+import {DataService} from "../data";
+import {RequestMethod} from "../router/enum/request-method.enum";
+import {RequestContext} from "../router/interface/request-context.interface";
+import {Controller} from "../router/decorator/controller.decorator";
+import {ViewDefinition} from "./class/view-definition.class";
 
 @Controller("view")
-export default class ViewDeleteController extends AbstractController {
-
-    private viewService: ViewService = Enemene.app.inject(ViewService);
-
-    getView<ENTITY extends DataObject<ENTITY>>(viewName: string, user: AbstractUser): View<ENTITY> {
-        Enemene.app.inject(PermissionService).checkViewPermission(viewName, RequestMethod.GET, user);
-        return this.viewService.getViewNotNull(viewName);
-    }
+export default class ViewDeleteController extends AbstractViewController {
 
     @Delete("/:view/:id", true)
-    async deleteObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
-                                                          @Path("view") viewName: string,
+    async deleteObject<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
                                                           @Path("id") objectId: uuid,
-                                                          @Context() context: Dictionary<serializable>): Promise<void> {
-        const view: View<ENTITY> = this.getView(viewName, user);
+                                                          @Context() context: RequestContext<AbstractUser>): Promise<void> {
+        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.DELETE, context);
 
-        const object: DataObject<ENTITY> = await DataService.findNotNullById(view.entity(), objectId, this.viewService.getFindOptions(view, ["*"], user, context));
+        const object: DataObject<ENTITY> = await DataService.findNotNullById(viewDefinition.entity, objectId, this.viewService.getFindOptions(viewDefinition, context));
 
-        await DataService.delete(view.entity(), object);
+        await DataService.delete(object, context);
     }
 
-    @Delete("/:view/:id/:attribute/:subId", true)
-    async deleteCollectionObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
-                                                                    @Path("view") viewName: string,
-                                                                    @Path("id") objectId: uuid,
-                                                                    @Path("attribute") collectionField: keyof ENTITY,
-                                                                    @Path("subId") subObjectId: uuid,
-                                                                    @Context() context: Dictionary<serializable>): Promise<void> {
-        const baseView: View<ENTITY> = this.getView(viewName, user);
-        if (!baseView.$fields.find(field => field.name === collectionField)) {
-            throw new ObjectNotFoundError();
-        }
-        const field: EntityField = ModelService.getFields<ENTITY>(baseView.entity().name)[collectionField];
-        if (field.isSimpleField) {
-            throw new RuntimeError(`Cannot delete simple data field "${collectionField}".`);
-        }
-        const baseObject: ENTITY = await DataService.findNotNullById(baseView.entity(), objectId, this.viewService.getFindOptions(baseView, [collectionField as string], user, context));
-        const object: DataObject<any> = await DataService.findById((field as ReferenceField).classGetter(), subObjectId);
-        if (object) {
-            await baseObject.$remove(collectionField as string, subObjectId);
-            await DataService.delete((field as ReferenceField).classGetter(), object);
-        }
-    }
+    //
+    // @Delete("/:view/:id/:attribute/:subId", true)
+    // async deleteCollectionObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
+    //                                                                 @Path("view") viewName: string,
+    //                                                                 @Path("id") objectId: uuid,
+    //                                                                 @Path("attribute") collectionField: keyof ENTITY,
+    //                                                                 @Path("subId") subObjectId: uuid,
+    //                                                                 @Context() context: Dictionary<serializable>): Promise<void> {
+    //     const baseView: View<ENTITY> = this.getViewDefinition(viewName, user);
+    //     if (!baseView.$fields.find(field => field.name === collectionField)) {
+    //         throw new ObjectNotFoundError();
+    //     }
+    //     const field: EntityField = ModelService.getFields<ENTITY>(baseView.entity().name)[collectionField];
+    //     if (field.isSimpleField) {
+    //         throw new RuntimeError(`Cannot delete simple data field "${collectionField}".`);
+    //     }
+    //     const baseObject: ENTITY = await DataService.findNotNullById(baseView.entity(), objectId, this.viewService.getFindOptions(baseView, [collectionField as string], user, context));
+    //     const object: DataObject<any> = await DataService.findById((field as ReferenceField).classGetter(), subObjectId);
+    //     if (object) {
+    //         await baseObject.$remove(collectionField as string, subObjectId);
+    //         await DataService.delete((field as ReferenceField).classGetter(), object);
+    //     }
+    // }
 }

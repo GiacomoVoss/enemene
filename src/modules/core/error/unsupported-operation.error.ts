@@ -5,8 +5,8 @@ export class UnsupportedOperationError extends RuntimeError {
     statusCode: number = 400;
     type: string = "UnsupportedOperationError";
 
-    constructor() {
-        super("");
+    constructor(message: string) {
+        super(`Unsupported operation: ${message}`);
     }
 }
 

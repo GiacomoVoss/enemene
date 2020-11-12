@@ -1,13 +1,10 @@
-import {RegisterActionParameter} from "./action-parameter.decorator";
-import {ActionParameterType} from "../enum/parameter-type.enum";
-import {View} from "../../view";
 import {ConstructorOf} from "../../../../base/constructor-of";
+import {AbstractAction} from "..";
+import {RegisterParameter} from "../../router/decorator/parameter/parameter.decorator";
+import {ActionParameterType} from "../enum/action-parameter-type.enum";
 
-export function ActionInput(label: string, view: ConstructorOf<View<any>>) {
-    return function (target, propertyKey, parameterIndex: number): void {
-        RegisterActionParameter(label, ActionParameterType.INPUT, {
-            view: view,
-            viewName: view.name,
-        })(target, propertyKey, parameterIndex);
+export function ActionInput(stepIndex: number): Function {
+    return function (target: ConstructorOf<AbstractAction>, propertyKey: string, parameterIndex: number): void {
+        RegisterParameter(ActionParameterType.INPUT, stepIndex)(target, propertyKey, parameterIndex);
     };
 }

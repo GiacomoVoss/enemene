@@ -7,7 +7,6 @@ export * from "./decorator/put.decorator";
 export * from "./decorator/controller.decorator";
 export * from "./decorator/parameter/body.decorator";
 export * from "./decorator/parameter/context.decorator";
-export * from "./decorator/parameter/current-user.decorator";
 export * from "./decorator/parameter/path.decorator";
 export * from "./decorator/parameter/query.decorator";
 export * from "./decorator/parameter/request.decorator";

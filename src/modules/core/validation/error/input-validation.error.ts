@@ -6,7 +6,7 @@ export class InputValidationError extends RuntimeError {
     statusCode: number = 400;
     type: string = "InputValidationError";
 
-    constructor(private details: ValidationError[]) {
+    constructor(protected details: ValidationError[]) {
         super(`Validation failed.`);
     }
 

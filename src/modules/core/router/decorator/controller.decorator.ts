@@ -1,7 +1,7 @@
 import {AbstractController} from "../class/abstract-controller.class";
 
-export function Controller(modulePath: string) {
+export function Controller(path: string) {
     return function (target: new () => AbstractController) {
-        target.prototype.$modulePath = modulePath;
+        target.prototype.$path = path;
     };
 }

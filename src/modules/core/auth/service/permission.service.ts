@@ -7,15 +7,13 @@ import {UnauthorizedError} from "../error/unauthorized.error";
 import {RequestMethod} from "../../router/enum/request-method.enum";
 import {Permission} from "../enum/permission.enum";
 import {ViewService} from "../../view/service/view.service";
-import {Enemene, View} from "../../../..";
+import {Enemene} from "../../../..";
 import {ObjectNotFoundError} from "../../error/object-not-found.error";
-import {ActionConfiguration} from "../../action/interface/action-configuration.interface";
-import {ActionParameterConfiguration} from "../../action/interface/action-parameter-configuration.interface";
-import {ConstructorOf} from "../../../../base/constructor-of";
+import chalk from "chalk";
+import {RequestContext} from "../../router/interface/request-context.interface";
+import {ViewDefinition} from "../../view/class/view-definition.class";
 
 export class PermissionService {
-
-    public static DEVELOPER_ROLE_ID: string = "71d13c75-074d-4129-b2e7-99e6852ab3eb";
 
     private permissionCache: Dictionary<{ route: Dictionary<RoutePermission[]>, view: Dictionary<ViewPermission> }, uuid> = {};
 
@@ -47,7 +45,7 @@ export class PermissionService {
             throw new UnauthorizedError();
         }
 
-        if (user.roleId === PermissionService.DEVELOPER_ROLE_ID) {
+        if (Enemene.app.config.developerRoleId && user.roleId === Enemene.app.config.developerRoleId) {
             return;
         }
         const rolePermission: RoutePermission = this.permissionCache[user.roleId]?.route[fullPath]?.find((permission: RoutePermission) => permission.method === pathDefinition.method);
@@ -57,14 +55,35 @@ export class PermissionService {
         }
     }
 
-    public checkViewPermission(viewName: string, method: RequestMethod, user?: AbstractUser): void {
+    public checkActionPermission(viewName: string, actionName: string, context: RequestContext<AbstractUser>): void {
         let viewPermission: ViewPermission;
-        if (!user) {
+        if (!context.currentUser) {
             viewPermission = this.permissionCache["PUBLIC"]?.view[viewName];
         } else {
-            viewPermission = this.permissionCache[user.roleId]?.view[viewName];
+            viewPermission = this.permissionCache[context.currentUser.roleId]?.view[viewName];
         }
-        if (user && user.roleId === PermissionService.DEVELOPER_ROLE_ID) {
+        if (context.currentUser && Enemene.app.config.developerRoleId && context.currentUser.roleId === Enemene.app.config.developerRoleId) {
+            return;
+        }
+        if (!viewPermission) {
+            viewPermission = this.defaultPermissions.view[viewName];
+        }
+        if (!viewPermission) {
+            throw new ObjectNotFoundError();
+        }
+        if (!viewPermission.actions.includes(actionName)) {
+            throw new ObjectNotFoundError();
+        }
+    }
+
+    public checkViewPermission(viewName: string, method: RequestMethod, context: RequestContext<AbstractUser>): void {
+        let viewPermission: ViewPermission;
+        if (!context.currentUser) {
+            viewPermission = this.permissionCache["PUBLIC"]?.view[viewName];
+        } else {
+            viewPermission = this.permissionCache[context.currentUser.roleId]?.view[viewName] ?? this.permissionCache["PUBLIC"]?.view[viewName];
+        }
+        if (context.currentUser && Enemene.app.config.developerRoleId && context.currentUser.roleId === Enemene.app.config.developerRoleId) {
             return;
         }
         if (!viewPermission) {
@@ -115,27 +134,11 @@ export class PermissionService {
             this.permissionCache[routePermission.roleId].route[routePermission.route].push(routePermission);
         } else if ((permission as ViewPermission).view) {
             const viewPermission = permission as ViewPermission;
-            const view: View<any> = this.viewService.getViewNotNull(viewPermission.view);
-            if (!view) {
-                Enemene.log.warn(this.constructor.name, `Permission ${viewPermission.id} applies to non-existing view "${viewPermission.view}".`);
+            const viewDefinition: ViewDefinition<any> = this.viewService.getViewDefinition(viewPermission.view);
+            if (!viewDefinition) {
+                Enemene.log.warn(this.constructor.name, `Permission ${chalk.bold(viewPermission.id)} applies to non-existing view ${chalk.bold(viewPermission.view)}.`);
             }
             this.permissionCache[viewPermission.roleId].view[viewPermission.view] = viewPermission;
-            if (viewPermission.getPermissions().includes(Permission.UPDATE) || viewPermission.getPermissions().includes(Permission.CREATE)) {
-                view.getActionConfigurations().forEach((action: ActionConfiguration) => {
-                    action.parameters.forEach((param: ActionParameterConfiguration) => {
-                        const subView: ConstructorOf<View<any>> = param.config.view as ConstructorOf<View<any>> | undefined;
-                        if (subView) {
-                            const subViewPermission = new ViewPermission();
-                            subViewPermission.roleId = viewPermission.roleId;
-                            subViewPermission.role = viewPermission.role;
-                            subViewPermission.permissions = "r";
-                            subViewPermission.view = `${action.name}_${subView.name}`;
-                            subViewPermission.id = "autogenerated";
-                            this.registerPermission(subViewPermission);
-                        }
-                    });
-                });
-            }
         }
     }
 }

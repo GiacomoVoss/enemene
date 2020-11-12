@@ -12,14 +12,21 @@ export function Reference(label: string | string[], classGetter: () => any, requ
         fields[propertyKey] = new ReferenceField(propertyKey, label, classGetter, `${propertyKey}Id`, required);
         fields[`${propertyKey}Id`] = new EntityField(`${propertyKey}Id`, label + " ID", EntityFieldType.UUID, false);
         ModelService.FIELDS[target.constructor.name] = fields;
-        sq.BelongsTo(classGetter, {
-            foreignKey: propertyKey + "Id",
-        })(target, propertyKey);
-        sq.ForeignKey(classGetter)(target, propertyKey);
         sq.Column({
             type: DataType.STRING,
             field: propertyKey + "Id",
             allowNull: !required,
         });
+        sq.BelongsTo(classGetter, {
+            foreignKey: {
+                field: propertyKey + "Id",
+                name: propertyKey + "Id",
+                allowNull: !required,
+            },
+            onUpdate: "CASCADE",
+            onDelete: required ? "RESTRICT" : "SET NULL",
+            constraints: true,
+            foreignKeyConstraint: true
+        })(target, propertyKey);
     };
 }

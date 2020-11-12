@@ -7,27 +7,20 @@ import {ViewService} from "../view";
 import {EnemeneConfig} from "./interface/enemene-config.interface";
 import {Sequelize} from "sequelize-typescript";
 import {DbImport} from "./bin/db-import";
-import ViewGetController from "../view/view-get.controller";
-import ViewPostController from "../view/view-post.controller";
-import ViewDeleteController from "../view/view-delete.controller";
-import AuthController from "../auth/auth.controller";
-import {ModelController} from "../model/model.controller";
 import {Dictionary} from "../../../base/type/dictionary.type";
-import {PathDefinition} from "../auth/interface/path-definition.interface";
 import {PermissionService} from "../auth/service/permission.service";
 import chalk from "chalk";
 import {LogService} from "../log/service/log.service";
-import {AbstractAction} from "../action/class/abstract-action.class";
 import {ActionService} from "../action/service/action.service";
-import ActionController from "../action/action.controller";
 import {AuthService} from "../auth/service/auth.service";
 import https from "https";
 import * as fs from "fs";
-import ViewPutController from "../view/view-put.controller";
 import {Role, RoutePermission, ViewPermission} from "../auth";
 import {ConstructorOf} from "../../../base/constructor-of";
-import {AbstractController} from "../router/class/abstract-controller.class";
-import {View} from "../view/class/view.class";
+import {FileService} from "../file/service/file.service";
+import {DataImport} from "../import/model/data-import.model";
+import {ImportFieldMapping} from "../import/model/import-field-mapping.model";
+import {ImportReferenceMapping} from "../import/model/import-reference-mapping.model";
 import bodyParser = require("body-parser");
 
 require("express-async-errors");
@@ -39,9 +32,9 @@ export class Enemene {
     public static app: Enemene;
 
     public static log: LogService;
-    public express: express.Application;
     public db: Sequelize;
     public devMode: boolean;
+    private express: express.Application;
     private services: Dictionary<any> = {};
     private routerService: RouterService;
 
@@ -68,6 +61,9 @@ export class Enemene {
                 Role,
                 RoutePermission,
                 ViewPermission,
+                DataImport,
+                ImportFieldMapping,
+                ImportReferenceMapping,
             ],
             modelMatch: (filename, member) => {
                 const kebab: string[] = filename.substring(0, filename.indexOf(".model")).split("-");
@@ -77,7 +73,7 @@ export class Enemene {
                 Enemene.log.debug("Database", `Registering model ${chalk.bold(camel)}.`);
                 return camel === member;
             },
-            logging: sql => Enemene.log.debug("Database", sql),
+            logging: sql => Enemene.log.silly("Database", sql),
         });
 
         if (this.config.security) {
@@ -90,43 +86,18 @@ export class Enemene {
         Enemene.log = new LogService(config.logLevel, config.logPath);
         Enemene.app = new Enemene(config);
         await Enemene.app.db.authenticate();
+        await Enemene.app.setup();
         return Enemene.app;
-    }
-
-    public getSingleton<ENTITY>(clazz: new () => ENTITY): ENTITY {
-        return this.services[clazz.name];
     }
 
     /**
      * Import database from fixtures and terminate.
      */
-    public async importDatabase(fixturesPath: string): Promise<void> {
-        await new DbImport(this.db, fixturesPath).resetAndImportDb();
-    }
-
-    public async setup(controllers: Dictionary<Function>,
-                       views: Dictionary<ConstructorOf<View<any>>>,
-                       actions?: Dictionary<typeof AbstractAction>,
-                       services?: Dictionary<Function>): Promise<void> {
-        if (services) {
-            await this.setupServices(services);
-        }
-        this.routerService = this.inject(RouterService);
-        await this.setupControllers({
-            ...controllers,
-            AuthController,
-            ActionController,
-            ViewGetController,
-            ViewPostController,
-            ViewPutController,
-            ViewDeleteController,
-            ModelController,
-        });
-        await this.setupViews(views);
-        if (actions) {
-            await this.setupActions(actions);
-        }
-        await this.inject(PermissionService).buildCache();
+    public static async importDatabase(config: EnemeneConfig, ...fixturesPaths: string[]): Promise<void> {
+        Enemene.log = new LogService(config.logLevel, config.logPath);
+        const app: Enemene = new Enemene(config);
+        await app.db.authenticate();
+        await new DbImport(app.db, fixturesPaths).resetAndImportDb();
     }
 
     public start(): void {
@@ -156,14 +127,17 @@ export class Enemene {
         }
     }
 
-    private async setupControllers(routers: Dictionary<ConstructorOf<AbstractController>>): Promise<void> {
-        Object.values(routers)
-            .filter((router: ConstructorOf<AbstractController>) => !!router.prototype.$modulePath)
-            .forEach((router: ConstructorOf<AbstractController>) => {
-                (router.prototype.$paths || []).forEach((pathDefinition: PathDefinition) => {
-                    this.routerService.register(router, pathDefinition);
-                });
-            });
+    private async setup(): Promise<void> {
+        await this.setupServices();
+        this.routerService = this.inject(RouterService);
+        await this.setupControllers();
+        await this.setupViews();
+        await this.setupActions();
+        await this.inject(PermissionService).buildCache();
+    }
+
+    private async setupControllers(): Promise<void> {
+        await this.routerService.init();
 
         if (this.config.frontend) {
             if (this.config.frontend.startsWith("http://") || this.config.frontend.startsWith("https://")) {
@@ -185,25 +159,26 @@ export class Enemene {
         }
     }
 
-    private async setupViews(views: Dictionary<ConstructorOf<View<any>>>): Promise<void> {
-        await this.inject(ViewService).init(views);
+    private async setupViews(): Promise<void> {
+        await this.inject(ViewService).init();
     }
 
-    private async setupActions(actions: Dictionary<Function>): Promise<void> {
-        await this.inject(ActionService).init(actions);
+    private async setupActions(): Promise<void> {
+        await this.inject(ActionService).init();
     }
 
-    private async setupServices(services: Dictionary<Function>): Promise<void> {
-        for (const name in services) {
-            if (services.hasOwnProperty(name)) {
-                const serviceClass = services[name] as any;
-                Enemene.log.debug("Server", "Registering service " + name);
-                if (serviceClass.prototype.onStart) {
-                    this.services[name] = new serviceClass();
-                    this.services[name].onStart();
+    private async setupServices(): Promise<void> {
+        const serviceFiles: string[] = this.inject(FileService).scanForFilePattern(process.cwd(), /.*\.service\.js/);
+        const serviceModules: Dictionary<ConstructorOf<Function>>[] = await Promise.all(serviceFiles.map((filePath: string) => import(filePath)));
+        serviceModules.forEach((moduleMap: Dictionary<ConstructorOf<Function>>) => {
+            Object.values(moduleMap).forEach((module: ConstructorOf<Function>) => {
+                Enemene.log.debug("Server", "Registering service " + module.name);
+                if (module.prototype.onStart) {
+                    this.services[module.name] = new module();
+                    this.services[module.name].onStart();
                 }
-            }
-        }
+            });
+        });
     }
 
     public inject<SERVICE>(serviceClass: new () => SERVICE): SERVICE {

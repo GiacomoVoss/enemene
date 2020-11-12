@@ -6,7 +6,7 @@ export class IntegrityViolationError extends RuntimeError {
     type: string = "IntegrityViolationError";
 
     constructor() {
-        super("");
+        super("Integrity violation");
     }
 }
 

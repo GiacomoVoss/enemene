@@ -10,7 +10,7 @@ const YAML = require("yaml");
 export class DbImport {
 
     constructor(private db: Sequelize,
-                private fixturesPath: string) {
+                private fixturesPaths: string[]) {
     }
 
     public async resetAndImportDb() {
@@ -33,9 +33,11 @@ export class DbImport {
 
     private async importData(transaction) {
         try {
-            const files: string[] = fs.readdirSync(this.fixturesPath);
-            for (const i in files) {
-                await this.importFile(path.join(this.fixturesPath, files[i]), transaction);
+            for (const fixturesPath of this.fixturesPaths) {
+                const files: string[] = fs.readdirSync(fixturesPath);
+                for (const i in files) {
+                    await this.importFile(path.join(fixturesPath, files[i]), transaction);
+                }
             }
         } catch (err) {
             Enemene.log.error(this.constructor.name, err);

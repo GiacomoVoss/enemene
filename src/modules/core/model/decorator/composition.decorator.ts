@@ -12,13 +12,15 @@ export function Composition(label: string | string[], classGetter: () => any, re
         ModelService.FIELDS[target.constructor.name] = fields;
         sq.BelongsTo(classGetter, {
             foreignKey: `${propertyKey}Id`,
-            onDelete: "CASCADE",
+            onDelete: required ? "RESTRICT" : "SET NULL",
             onUpdate: "CASCADE",
         })(target, propertyKey, descriptor);
         sq.ForeignKey(classGetter)(target, propertyKey);
         sq.Column({
             type: DataType.STRING,
-            allowNull: !required
+            allowNull: !required,
+            onDelete: "CASCADE",
+            onUpdate: "RESTRICT",
         })(target, `${propertyKey}Id`, descriptor);
     };
 }

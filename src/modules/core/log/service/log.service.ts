@@ -20,6 +20,10 @@ export class LogService {
         });
     }
 
+    public silly(component: string, message: any): void {
+        this.logInternal(this.log.silly, component, message);
+    }
+
     public debug(component: string, message: any): void {
         this.logInternal(this.log.debug, component, message);
     }

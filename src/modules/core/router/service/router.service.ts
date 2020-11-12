@@ -4,7 +4,6 @@ import {Response} from "express-serve-static-core";
 import {ParameterType} from "../enum/parameter-type.enum";
 import * as express from "express";
 import {Application, NextFunction} from "express";
-import {AbstractUser} from "../../auth";
 import {authenticatedGuard} from "../../auth/guard/authenticated.guard";
 import {RequestMethod} from "../enum/request-method.enum";
 import {RuntimeError} from "../../application/error/runtime.error";
@@ -15,8 +14,20 @@ import {InputValidationError} from "../../validation/error/input-validation.erro
 import {Redirect} from "../class/redirect.class";
 import {ConstructorOf} from "../../../../base/constructor-of";
 import {AbstractController} from "../class/abstract-controller.class";
+import {CustomResponse} from "../class/custom-response.class";
+import {IntegrityViolationError} from "../../error/integrity-violation.error";
+import AuthController from "../../auth/auth.controller";
+import ActionController from "../../action/action.controller";
+import ViewGetController from "../../view/view-get.controller";
+import ViewPostController from "../../view/view-post.controller";
+import ViewPutController from "../../view/view-put.controller";
+import ViewDeleteController from "../../view/view-delete.controller";
+import {ModelController} from "../../model/model.controller";
+import {FileService} from "../../file/service/file.service";
 
 export class RouterService {
+
+    private fileService: FileService = Enemene.app.inject(FileService);
 
     public paths: Dictionary<Dictionary<PathDefinition>, RequestMethod> = {
         [RequestMethod.GET]: {},
@@ -29,6 +40,31 @@ export class RouterService {
 
     private permissionService: PermissionService = Enemene.app.inject(PermissionService);
 
+    async init(): Promise<void> {
+        const controllerFiles: string[] = this.fileService.scanForFilePattern(process.cwd(), /.*\.controller\.js/);
+        const controllerModules: Dictionary<ConstructorOf<AbstractController>>[] = await Promise.all(controllerFiles.map((filePath: string) => import(filePath)));
+        controllerModules.forEach((moduleMap: Dictionary<ConstructorOf<AbstractController>>) => {
+            Object.values(moduleMap).forEach((module: ConstructorOf<AbstractController>) => {
+                (module.prototype.$paths || []).forEach((pathDefinition: PathDefinition) => {
+                    this.register(module, pathDefinition);
+                });
+            });
+        });
+
+        [AuthController,
+            ActionController,
+            ViewGetController,
+            ViewPostController,
+            ViewPutController,
+            ViewDeleteController,
+            ModelController,
+        ].forEach((module: ConstructorOf<AbstractController>) => {
+            (module.prototype.$paths || []).forEach((pathDefinition: PathDefinition) => {
+                this.register(module, pathDefinition);
+            });
+        });
+    }
+
     public static hasRoute(method: RequestMethod, route: string): boolean {
         let routeToSearch: string = route;
         if (!routeToSearch.startsWith("/")) {
@@ -38,7 +74,7 @@ export class RouterService {
     }
 
     public register(router: ConstructorOf<AbstractController>, pathDefinition: PathDefinition): void {
-        const moduleName: string = router.prototype.$modulePath;
+        const moduleName: string = router.prototype.$path;
         let fullPath: string = `/${moduleName}`;
         if (pathDefinition.path === "/") {
             this.paths[pathDefinition.method][fullPath] = pathDefinition;
@@ -99,9 +135,13 @@ export class RouterService {
      */
     public async logError(err: RuntimeError, req: SecureRequest, res: Response, next: Function) {
 
+        if (err.name === "SequelizeForeignKeyConstraintError") {
+            err = new IntegrityViolationError();
+        }
+
         const statusCode = err.statusCode || 500;
 
-        if ([400, 401, 403, 404].includes(statusCode)) {
+        if ([400, 401, 403, 404, 423].includes(statusCode)) {
             Enemene.log.info("Access", `${req.payload ? "(" + req.payload.username + ") " : ""}${err.message}`);
         } else {
             Enemene.log.error("Access", `${req.payload ? "(" + req.payload.username + ") " : ""}${err.message}`);
@@ -121,9 +161,11 @@ export class RouterService {
             Enemene.log.debug(this.constructor.name, `Instantiating ${pathDefinition.controller.name}.`);
             this.controllers[pathDefinition.controller.name] = new pathDefinition.controller();
         }
-        const result: any | Redirect = await pathDefinition.fn.apply(this.controllers[pathDefinition.controller.name], parameterValues);
+        const result: any | Redirect | CustomResponse<any> = await pathDefinition.fn.apply(this.controllers[pathDefinition.controller.name], parameterValues);
         if (result instanceof Redirect) {
             res.redirect(result.url);
+        } else if (result instanceof CustomResponse) {
+            res.status(result.status).send(result.data);
         } else {
             res.send(result);
         }
@@ -155,16 +197,15 @@ export class RouterService {
                     parameterValue = req.body;
                 }
                 break;
-            case ParameterType.CURRENT_USER:
-                parameterValue = req.payload as AbstractUser;
-                optional = true;
-                break;
             case ParameterType.CONTEXT:
                 context = req.query["context"] ? JSON.parse(req.query["context"] as string) : {};
                 if (value) {
                     parameterValue = context[value];
                 } else {
-                    parameterValue = context;
+                    parameterValue = {
+                        ...context,
+                        currentUser: req.payload,
+                    };
                 }
                 break;
             case ParameterType.HEADER:
