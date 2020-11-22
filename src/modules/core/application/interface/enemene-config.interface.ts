@@ -14,6 +14,11 @@ export interface EnemeneConfig {
     port: string;
 
     /**
+     * The path where all modules like services, controllers and views are.
+     */
+    modulesPath: string;
+
+    /**
      * The log level to show in the log.
      */
     logLevel: LogLevel;

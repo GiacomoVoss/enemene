@@ -168,7 +168,7 @@ export class Enemene {
     }
 
     private async setupServices(): Promise<void> {
-        const serviceFiles: string[] = this.inject(FileService).scanForFilePattern(process.cwd(), /.*\.service\.js/);
+        const serviceFiles: string[] = this.inject(FileService).scanForFilePattern(Enemene.app.config.modulesPath, /.*\.service\.js/);
         const serviceModules: Dictionary<ConstructorOf<Function>>[] = await Promise.all(serviceFiles.map((filePath: string) => import(filePath)));
         serviceModules.forEach((moduleMap: Dictionary<ConstructorOf<Function>>) => {
             Object.values(moduleMap)

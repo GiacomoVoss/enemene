@@ -30,7 +30,7 @@ export class ViewService {
      * Initializes the ViewService by importing all available views and making them available.
      */
     public async init() {
-        const viewFiles: string[] = this.fileService.scanForFilePattern(process.cwd(), /.*\.view\.js/);
+        const viewFiles: string[] = this.fileService.scanForFilePattern(Enemene.app.config.modulesPath, /.*\.view\.js/);
         const viewModules: Dictionary<ConstructorOf<View<any>>>[] = await Promise.all(viewFiles.map((filePath: string) => import(filePath)));
         let count: number = 0;
         viewModules

@@ -27,7 +27,7 @@ export class ActionService {
      * Initializes the ActionService by importing all available actions and making them available.
      */
     public async init() {
-        const actionFiles: string[] = this.fileService.scanForFilePattern(process.cwd(), /.*\.action\.js/);
+        const actionFiles: string[] = this.fileService.scanForFilePattern(Enemene.app.config.modulesPath, /.*\.action\.js/);
         const actionModules: Dictionary<ConstructorOf<AbstractAction>>[] = await Promise.all(actionFiles.map((filePath: string) => import(filePath)));
         let length: number = 0;
         actionModules.forEach((moduleMap: Dictionary<ConstructorOf<AbstractAction>>) => {

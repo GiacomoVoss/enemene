@@ -41,7 +41,7 @@ export class RouterService {
     private permissionService: PermissionService = Enemene.app.inject(PermissionService);
 
     async init(): Promise<void> {
-        const controllerFiles: string[] = this.fileService.scanForFilePattern(process.cwd(), /.*\.controller\.js/);
+        const controllerFiles: string[] = this.fileService.scanForFilePattern(Enemene.app.config.modulesPath, /.*\.controller\.js/);
         const controllerModules: Dictionary<ConstructorOf<AbstractController>>[] = await Promise.all(controllerFiles.map((filePath: string) => import(filePath)));
         controllerModules.forEach((moduleMap: Dictionary<ConstructorOf<AbstractController>>) => {
             Object.values(moduleMap).forEach((module: ConstructorOf<AbstractController>) => {

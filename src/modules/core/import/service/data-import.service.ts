@@ -16,7 +16,7 @@ export class DataImportService {
     private importDefinitions: Dictionary<AbstractImportDefinition<any>> = {};
 
     public async onStart(): Promise<void> {
-        const serviceFiles: string[] = Enemene.app.inject(FileService).scanForFilePattern(process.cwd(), /.*\.import\.js/);
+        const serviceFiles: string[] = Enemene.app.inject(FileService).scanForFilePattern(Enemene.app.config.modulesPath, /.*\.import\.js/);
         const serviceModules: Dictionary<ConstructorOf<AbstractImportDefinition<any>>>[] = await Promise.all(serviceFiles.map((filePath: string) => import(filePath)));
         serviceModules.forEach((moduleMap: Dictionary<ConstructorOf<AbstractImportDefinition<any>>>) => {
             Object.values(moduleMap).forEach((module: ConstructorOf<AbstractImportDefinition<any>>) => {
