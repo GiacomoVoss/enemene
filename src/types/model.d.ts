@@ -65,7 +65,11 @@ export declare class DataService {
 
     public findByIdNotNull<ENTITY extends DataObject<ENTITY>>(clazz: any, id: number | string): Promise<ENTITY>;
 
+    public findById<ENTITY extends DataObject<ENTITY>>(clazz: any, id: number | string): Promise<ENTITY | undefined>;
+
     public findOneNotNull<ENTITY extends DataObject<ENTITY>>(clazz: any, filter?: AbstractFilter): Promise<ENTITY>;
+
+    public findOne<ENTITY extends DataObject<ENTITY>>(clazz: any, filter?: AbstractFilter): Promise<ENTITY | undefined>
 
     public create<T extends DataObject<T>>(clazz: any,
                                            data: Dictionary<serializable>,

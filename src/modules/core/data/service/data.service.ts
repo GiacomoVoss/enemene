@@ -53,9 +53,17 @@ export class DataService {
     }
 
     public async findOneNotNull<ENTITY extends DataObject<ENTITY>>(clazz: any, filter?: AbstractFilter): Promise<ENTITY> {
+        const object: ENTITY | undefined = await this.findOne(clazz, filter);
+        if (!object) {
+            throw new ObjectNotFoundError(clazz.name);
+        }
+        return object;
+    }
+
+    public async findOne<ENTITY extends DataObject<ENTITY>>(clazz: any, filter?: AbstractFilter): Promise<ENTITY | undefined> {
         const objects: ENTITY[] = await this.findAll(clazz, filter);
         if (objects.length !== 1) {
-            throw new ObjectNotFoundError(clazz.name);
+            return undefined;
         }
         return objects[0];
     }
