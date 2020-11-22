@@ -240,8 +240,7 @@ export class DataService {
                     ...where,
                     ...(options.where ?? {})
                 },
-                transaction: t
-            }, transaction);
+            }, t);
 
             if (!newObject) {
                 throw new UnauthorizedError();
