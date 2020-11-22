@@ -171,13 +171,15 @@ export class Enemene {
         const serviceFiles: string[] = this.inject(FileService).scanForFilePattern(process.cwd(), /.*\.service\.js/);
         const serviceModules: Dictionary<ConstructorOf<Function>>[] = await Promise.all(serviceFiles.map((filePath: string) => import(filePath)));
         serviceModules.forEach((moduleMap: Dictionary<ConstructorOf<Function>>) => {
-            Object.values(moduleMap).forEach((module: ConstructorOf<Function>) => {
-                Enemene.log.debug("Server", "Registering service " + module.name);
-                if (module.prototype.onStart) {
-                    this.services[module.name] = new module();
-                    this.services[module.name].onStart();
-                }
-            });
+            Object.values(moduleMap)
+                .filter((module: ConstructorOf<Function>) => !!module.prototype)
+                .forEach((module: ConstructorOf<Function>) => {
+                    Enemene.log.debug("Server", "Registering service " + module.name);
+                    if (module.prototype.onStart) {
+                        this.services[module.name] = new module();
+                        this.services[module.name].onStart();
+                    }
+                });
         });
     }
 

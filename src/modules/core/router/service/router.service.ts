@@ -45,7 +45,7 @@ export class RouterService {
         const controllerModules: Dictionary<ConstructorOf<AbstractController>>[] = await Promise.all(controllerFiles.map((filePath: string) => import(filePath)));
         controllerModules.forEach((moduleMap: Dictionary<ConstructorOf<AbstractController>>) => {
             Object.values(moduleMap).forEach((module: ConstructorOf<AbstractController>) => {
-                (module.prototype.$paths || []).forEach((pathDefinition: PathDefinition) => {
+                (module.prototype?.$paths || []).forEach((pathDefinition: PathDefinition) => {
                     this.register(module, pathDefinition);
                 });
             });

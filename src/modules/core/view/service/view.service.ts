@@ -33,10 +33,11 @@ export class ViewService {
         const viewFiles: string[] = this.fileService.scanForFilePattern(process.cwd(), /.*\.view\.js/);
         const viewModules: Dictionary<ConstructorOf<View<any>>>[] = await Promise.all(viewFiles.map((filePath: string) => import(filePath)));
         let count: number = 0;
-        viewModules.forEach((moduleMap: Dictionary<ConstructorOf<View<any>>>) => {
-            Object.values(moduleMap).forEach((module: ConstructorOf<View<any>>) => this.addViewClass(module));
-            count += Object.values(moduleMap).length;
-        });
+        viewModules
+            .forEach((moduleMap: Dictionary<ConstructorOf<View<any>>>) => {
+                Object.values(moduleMap).forEach((module: ConstructorOf<View<any>>) => this.addViewClass(module));
+                count += Object.values(moduleMap).length;
+            });
         Enemene.log.info(this.constructor.name, `Registered ${chalk.bold(count)} views.`);
     }
 
