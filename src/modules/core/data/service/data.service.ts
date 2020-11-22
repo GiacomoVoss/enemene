@@ -61,11 +61,16 @@ export class DataService {
     }
 
     public async findByIdNotNull<ENTITY extends DataObject<ENTITY>>(clazz: any, id: number | string): Promise<ENTITY> {
-        const object: ENTITY = await clazz.findByPk(id);
+        const object: ENTITY = await this.findById(clazz, id);
         if (!object) {
             throw new ObjectNotFoundError(clazz.name);
         }
         return object;
+    }
+
+    public async findById<ENTITY extends DataObject<ENTITY>>(clazz: any, id: number | string): Promise<ENTITY | undefined> {
+        const object: ENTITY = await clazz.findByPk(id);
+        return object ?? undefined;
     }
 
     public static async findAllRaw<T extends DataObject<T>>(clazz: any, options: FindOptions = {}): Promise<T[]> {
