@@ -5,22 +5,18 @@ import express, {NextFunction, Request, Response} from "express";
 import path from "path";
 import {ViewService} from "../view";
 import {EnemeneConfig} from "./interface/enemene-config.interface";
-import {Sequelize} from "sequelize-typescript";
+import {Sequelize} from "sequelize";
 import {DbImport} from "./bin/db-import";
 import {Dictionary} from "../../../base/type/dictionary.type";
 import {PermissionService} from "../auth/service/permission.service";
-import chalk from "chalk";
 import {LogService} from "../log/service/log.service";
 import {ActionService} from "../action/service/action.service";
 import {AuthService} from "../auth/service/auth.service";
 import https from "https";
 import * as fs from "fs";
-import {Role, RoutePermission, ViewPermission} from "../auth";
 import {ConstructorOf} from "../../../base/constructor-of";
 import {FileService} from "../file/service/file.service";
-import {DataImport} from "../import/model/data-import.model";
-import {ImportFieldMapping} from "../import/model/import-field-mapping.model";
-import {ImportReferenceMapping} from "../import/model/import-reference-mapping.model";
+import {ModelService} from "../model/service/model.service";
 import bodyParser = require("body-parser");
 
 require("express-async-errors");
@@ -32,6 +28,7 @@ export class Enemene {
     public static app: Enemene;
 
     public static log: LogService;
+    public log: LogService;
     public db: Sequelize;
     public devMode: boolean;
     private express: express.Application;
@@ -43,7 +40,8 @@ export class Enemene {
         this.devMode = process.env.NODE_ENV === "development";
         this.express.use(allowHeaders);
         this.express.use(bodyParser.json());
-        Enemene.log[config.logLevel.toLowerCase()]("Server", "Log level: " + config.logLevel.toUpperCase());
+        this.log = Enemene.log;
+        this.log[config.logLevel.toLowerCase()]("Server", "Log level: " + config.logLevel.toUpperCase());
         this.config.port = `${this.normalizePort(config.port)}`;
 
         this.db = new Sequelize({
@@ -54,38 +52,13 @@ export class Enemene {
             database: config.db.database,
             dialect: "mysql",
             timezone: "+02:00",
-            modelPaths: [
-                process.cwd() + "/**/*.model.js",
-            ],
-            models: [
-                Role,
-                RoutePermission,
-                ViewPermission,
-                DataImport,
-                ImportFieldMapping,
-                ImportReferenceMapping,
-            ],
-            modelMatch: (filename, member) => {
-                const kebab: string[] = filename.substring(0, filename.indexOf(".model")).split("-");
-                const camel: string = kebab.map((chunk: string) =>
-                    chunk.substr(0, 1).toUpperCase() + chunk.substr(1).toLowerCase()
-                ).join("");
-                Enemene.log.debug("Database", `Registering model ${chalk.bold(camel)}.`);
-                return camel === member;
-            },
             logging: sql => Enemene.log.silly("Database", sql),
         });
-
-        if (this.config.security) {
-            AuthService.init(this.config.userModel, this.config.security.jwtPublicKeyPath, this.config.security.jwtPrivateKeyPath);
-        }
-
     }
 
     public static async create(config: EnemeneConfig): Promise<Enemene> {
         Enemene.log = new LogService(config.logLevel, config.logPath);
         Enemene.app = new Enemene(config);
-        await Enemene.app.db.authenticate();
         await Enemene.app.setup();
         return Enemene.app;
     }
@@ -96,11 +69,14 @@ export class Enemene {
     public static async importDatabase(config: EnemeneConfig, ...fixturesPaths: string[]): Promise<void> {
         Enemene.log = new LogService(config.logLevel, config.logPath);
         const app: Enemene = new Enemene(config);
-        await app.db.authenticate();
+        await app.inject(ModelService).init(app);
         await new DbImport(app.db, fixturesPaths).resetAndImportDb();
     }
 
     public start(): void {
+        if (Enemene.app.config.security) {
+            AuthService.init(Enemene.app.config.userModel, Enemene.app.config.security.jwtPublicKeyPath, Enemene.app.config.security.jwtPrivateKeyPath);
+        }
         if (this.config.ssl) {
             this.express.use((req: Request, res: Response, next: NextFunction) => {
                 if (req.secure) {
@@ -128,6 +104,7 @@ export class Enemene {
     }
 
     private async setup(): Promise<void> {
+        await this.inject(ModelService).init(this);
         await this.setupServices();
         this.routerService = this.inject(RouterService);
         await this.setupControllers();

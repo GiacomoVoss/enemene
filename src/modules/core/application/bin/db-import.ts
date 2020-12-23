@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import {Sequelize} from "sequelize-typescript";
+import {Sequelize} from "sequelize";
 import {Enemene} from "../enemene";
 import {UuidService} from "../../../..";
 import {omit} from "lodash";

@@ -12,6 +12,8 @@ import {Enemene} from "../../../..";
 @Entity
 export class ViewPermission extends DataObject<ViewPermission> implements AfterCreateHook {
 
+    $displayPattern = "{view} ({permissions})";
+
     @Field("View", EntityFieldType.STRING, true)
     view: string;
 
@@ -23,7 +25,7 @@ export class ViewPermission extends DataObject<ViewPermission> implements AfterC
 
     roleId: string;
 
-    @Field("actions", EntityFieldType.STRING_ARRAY)
+    @Field("Actions", EntityFieldType.STRING_ARRAY)
     actions: string[];
 
     getPermissions(): Permission[] {

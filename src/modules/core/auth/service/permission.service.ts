@@ -17,11 +17,6 @@ export class PermissionService {
 
     private permissionCache: Dictionary<{ route: Dictionary<RoutePermission[]>, view: Dictionary<ViewPermission> }, uuid> = {};
 
-    private defaultPermissions: { route: Dictionary<RoutePermission[]>, view: Dictionary<ViewPermission> } = {
-        route: {},
-        view: {},
-    };
-
     private viewService: ViewService = Enemene.app.inject(ViewService);
 
     public async buildCache(): Promise<void> {
@@ -29,10 +24,6 @@ export class PermissionService {
         const viewPermissions: ViewPermission[] = await ViewPermission.findAll();
 
         [...routePermissions, ...viewPermissions].forEach(permission => this.registerPermission(permission));
-        this.defaultPermissions = {
-            route: {},
-            view: {},
-        };
 
         Enemene.log.info(this.constructor.name, `Permission cache built, ${viewPermissions.length + routePermissions.length} permissions found.`);
     }
@@ -49,8 +40,7 @@ export class PermissionService {
             return;
         }
         const rolePermission: RoutePermission = this.permissionCache[user.roleId]?.route[fullPath]?.find((permission: RoutePermission) => permission.method === pathDefinition.method);
-        const defaultPermission: RoutePermission = this.defaultPermissions.route[fullPath]?.find((permission: RoutePermission) => permission.method === pathDefinition.method);
-        if (!rolePermission && !defaultPermission) {
+        if (!rolePermission) {
             throw new ObjectNotFoundError();
         }
     }
@@ -64,9 +54,6 @@ export class PermissionService {
         }
         if (context.currentUser && Enemene.app.config.developerRoleId && context.currentUser.roleId === Enemene.app.config.developerRoleId) {
             return;
-        }
-        if (!viewPermission) {
-            viewPermission = this.defaultPermissions.view[viewName];
         }
         if (!viewPermission) {
             throw new ObjectNotFoundError();
@@ -85,9 +72,6 @@ export class PermissionService {
         }
         if (context.currentUser && Enemene.app.config.developerRoleId && context.currentUser.roleId === Enemene.app.config.developerRoleId) {
             return;
-        }
-        if (!viewPermission) {
-            viewPermission = this.defaultPermissions.view[viewName];
         }
         if (!viewPermission) {
             throw new ObjectNotFoundError();

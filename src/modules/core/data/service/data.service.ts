@@ -16,7 +16,6 @@ import {OrderItem} from "sequelize/types/lib/model";
 import {uuid} from "../../../../base/type/uuid.type";
 import {AfterCreateHook, BeforeCreateHook} from "..";
 import {Validate} from "../../validation/class/validate.class";
-import {RuntimeError} from "../../application/error/runtime.error";
 import {BeforeDeleteHook} from "../interface/before-delete-hook.interface";
 import {Transaction} from "sequelize/types/lib/transaction";
 import {RequestContext} from "../../router/interface/request-context.interface";
@@ -158,7 +157,6 @@ export class DataService {
         const t: Transaction = transaction ?? await Enemene.app.db.transaction();
         try {
             object = await DataService.populate(data, t, context, object);
-
             ValidationService.validate(object);
             await object.save({transaction: t});
             if (!transaction) {
@@ -181,7 +179,7 @@ export class DataService {
                 await (object as unknown as BeforeDeleteHook).onBeforeDelete(context);
             }
 
-            const entityFields: EntityField[] = Object.values(ModelService.FIELDS[object.$entity]);
+            const entityFields: EntityField[] = Object.values(ModelService.MODEL[object.$entity]);
             await Promise.all(entityFields
                 .filter((field: EntityField) => field.type === "COMPOSITION")
                 .map(async (field: CompositionField) => {
@@ -222,6 +220,7 @@ export class DataService {
                 ...data,
                 $entity: clazz.name,
             }, t);
+
             ValidationService.validate(object as DataObject<T>);
 
             if ((object as unknown as BeforeCreateHook).onBeforeCreate) {
@@ -390,7 +389,10 @@ export class DataService {
                     }
                 }
             } else if (field instanceof CollectionField && data[key]) {
-                throw new RuntimeError("Cannot save collections directly.");
+                console.log(data[key]);
+                object[key as keyof T] = await Promise.all(data[key].map(async d => {
+                    const collectionObject = await DataService.populate(d, transaction, context, originalData);
+                })) as any;
             } else if (data[key] !== undefined) {
                 object[key as keyof T] = data[key];
             }

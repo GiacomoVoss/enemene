@@ -1,5 +1,5 @@
-import {Context, Get, Path, Query} from "../router";
-import {AbstractUser} from "../auth";
+import {Context, Get, Path, Query, Req} from "../router";
+import {AbstractUser, SecureRequest} from "../auth";
 import {DataResponse, DataService} from "../data";
 import {DataObject} from "../model";
 import {RequestMethod} from "../router/enum/request-method.enum";
@@ -16,19 +16,76 @@ import {UnsupportedOperationError} from "../error/unsupported-operation.error";
 import {RequestContext} from "../router/interface/request-context.interface";
 import {Controller} from "../router/decorator/controller.decorator";
 import {ViewDefinition} from "./class/view-definition.class";
+import {get} from "lodash";
+import {UuidService} from "../../..";
+import {InputValidationError} from "../validation/error/input-validation.error";
+
 
 @Controller("view")
 export default class ViewGetController extends AbstractViewController {
+
+    private filterFields<VIEW extends View<any>>(object: VIEW | VIEW[], fieldsString?: string): Dictionary<serializable> | Dictionary<serializable>[] {
+        if (!fieldsString) {
+            if (Array.isArray(object)) {
+                return object.map(obj => obj.toJSON());
+            } else {
+                return object.toJSON();
+            }
+        }
+
+        const fields: string[] = fieldsString.split(",");
+        const values: Dictionary<serializable> | Dictionary<serializable>[] = Array.isArray(object) ? [] : {};
+
+        for (let field of fields) {
+            if (field.includes(".")) {
+                const fieldTokens = field.split(".");
+                const firstToken = fieldTokens.shift();
+                if (firstToken.includes("#")) {
+                    throw new InputValidationError([]);
+                }
+            } else {
+                let actualField = field;
+                if (field.includes("#")) {
+                    actualField = field.replace("#", "");
+                }
+                let value: any = get(object, actualField);
+                if (field.includes("#") && Array.isArray(value)) {
+                    values[field] = value.length;
+                }
+                values[field] = value;
+            }
+        }
+
+        return values;
+    }
 
     @Get("/count/:view", true)
     async countObjects<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
                                                           @Query("search") search: string,
                                                           @Context() context: RequestContext<AbstractUser>): Promise<object> {
-        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.GET, context);
-
         return {
             data: {
-                count: await this.viewService.count(viewDefinition, context),
+                count: (await this.getObjects(viewName, "id", "", "", "", search, context, "")).data.length,
+            },
+        };
+    }
+
+    @Get("/count/:view/:id/*", true)
+    async countObjectsByPath<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
+                                                                @Path("id") objectId: string,
+                                                                @Query("search") search: string,
+                                                                @Req request: SecureRequest,
+                                                                @Context() context: RequestContext<AbstractUser>): Promise<object> {
+        const response: DataResponse<ENTITY> = await this.getByPath(viewName, objectId, request, "id", context);
+        let count = 0;
+        if (!Array.isArray(response.data)) {
+            count = 1;
+        } else {
+            count = response.data.length;
+        }
+        return {
+            data: {
+                count,
             },
         };
     }
@@ -41,10 +98,11 @@ export default class ViewGetController extends AbstractViewController {
                                                         @Query("offset") offset: string,
                                                         @Query("search") search: string,
                                                         @Context() context: RequestContext<AbstractUser>,
-                                                        @Header(HttpHeader.LANGUAGE) language: string): Promise<DataResponse<ENTITY>> {
+                                                        @Header(HttpHeader.LANGUAGE) language: string): Promise<DataResponse<ENTITY[]>> {
         const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.GET, context);
+        const data: View<ENTITY>[] = await this.viewService.findAll(viewDefinition, context, DataService.getFindOptions(order, limit, offset), search);
         return {
-            data: await this.viewService.findAll(viewDefinition, context, DataService.getFindOptions(order, limit, offset), search),
+            data: data.map((object: View<ENTITY>) => this.filterFields(object, requestedFields)),
             model: viewDefinition.getModel(language),
             actions: viewDefinition.getActionConfigurations(),
         };
@@ -57,71 +115,68 @@ export default class ViewGetController extends AbstractViewController {
                                                        @Context() context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
         const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.GET, context);
         return {
-            data: await this.viewService.findById(viewDefinition, objectId, context),
+            data: this.filterFields(await this.viewService.findById(viewDefinition, objectId, context), requestedFields) as Dictionary<any, keyof ENTITY>,
             model: viewDefinition.getModel(),
             actions: viewDefinition.getActionConfigurations(),
         };
     }
 
-    @Get("/:view/:id/:attribute", true)
-    async getCollection<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
-                                                           @Path("id") objectId: string,
-                                                           @Path("attribute") collectionField: keyof View<ENTITY>,
-                                                           @Query("fields") requestedFields: string,
-                                                           @Context() context: Dictionary<serializable>): Promise<DataResponse<any>> {
-        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.GET, context);
-        if (!viewDefinition.fields.find(field => field.name === collectionField)) {
-            throw new ObjectNotFoundError();
+    @Get("/:view/:id/*", true)
+    async getByPath<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
+                                                       @Path("id") objectId: string,
+                                                       @Req request: SecureRequest,
+                                                       @Query("fields") requestedFields: string,
+                                                       @Context() context: Dictionary<serializable>): Promise<DataResponse<any>> {
+        const attributePath = request.params[0];
+        if (!attributePath || !attributePath.length) {
+            return this.getObject(viewName, objectId, requestedFields, context);
         }
+
+        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.GET, context);
 
         const view: View<ENTITY> = await this.viewService.findById(viewDefinition, objectId, context);
 
+        const attributeTokens: string[] = attributePath.split("/");
+
+        let data = view;
+
+        for (const token of attributeTokens) {
+            if (Array.isArray(data)) {
+                if (UuidService.isUuid(token)) {
+                    data = data.find((obj: any) => obj.id === token);
+                } else if (!isNaN(Number.parseInt(token))) {
+                    data = data[Number.parseInt(token)];
+                } else {
+                    throw new InputValidationError([{
+                        type: "field",
+                        field: "attributePath",
+                        message: `Invalid attribute path: ${attributePath}`,
+                    }]);
+                }
+            } else {
+                data = get(data, token);
+            }
+        }
+
         return {
-            data: view[collectionField] as any,
-            model: viewDefinition.getModel(),
+            data,
+            model: viewDefinition.getModel(undefined, attributePath),
         };
     }
-
-    //
-    // @Get("/:view/:id/:attribute/:subId", true)
-    // async getCollectionObject<ENTITY extends DataObject<ENTITY>>(@CurrentUser user: AbstractUser,
-    //                                                              @Path("view") viewName: string,
-    //                                                              @Path("id") objectId: uuid,
-    //                                                              @Path("attribute") collectionField: keyof ENTITY,
-    //                                                              @Path("subId") subObjectId: uuid,
-    //                                                              @Query("fields") requestedFields: string,
-    //                                                              @Context() context: Dictionary<serializable>): Promise<DataResponse<any>> {
-    //     const baseView: View<ENTITY> = this.getViewDefinition(viewName, user);
-    //
-    //     if (!baseView.$fields.find(field => field.name === collectionField)) {
-    //         throw new UnauthorizedError();
-    //     }
-    //
-    //     const fields = this.viewService.getRequestedFields(requestedFields).map((field: string) => `${collectionField}.${field}`);
-    //
-    //     const data: DataObject<ENTITY> = await DataService.findNotNullById(baseView.entity(), objectId, this.viewService.getFindOptions(baseView, fields, user, context));
-    //     const model = baseView.getModel();
-    //
-    //     const subData: Dictionary<any, keyof ENTITY> = await DataService.filterFields(data, fields);
-    //
-    //     let subObject: DataObject<any>;
-    //     if (Array.isArray(subData[collectionField])) {
-    //         subObject = (subData[collectionField] as DataObject<any>[]).find(object => object.id === subObjectId);
-    //     } else {
-    //         subObject = (subData[collectionField] as DataObject<any>).id === subObjectId ? subData[collectionField] : null;
-    //     }
-    //
-    //     return {
-    //         data: subObject,
-    //         model,
-    //     };
-    // }
 
     @Get("/model/:view", true)
     async getViewModel(@Context() context: RequestContext<AbstractUser>,
                        @Path("view") viewName: string): Promise<Dictionary<serializable>> {
         const viewDefinition: ViewDefinition<any> = this.getViewDefinition(viewName, RequestMethod.GET, context);
         return viewDefinition.getModel();
+    }
+
+    @Get("/model/:view/*", true)
+    async getViewModelByPath(@Context() context: RequestContext<AbstractUser>,
+                             @Req request: SecureRequest,
+                             @Path("view") viewName: string): Promise<Dictionary<serializable>> {
+        const viewDefinition: ViewDefinition<any> = this.getViewDefinition(viewName, RequestMethod.GET, context);
+        return viewDefinition.getModel(undefined, request.params[0]);
     }
 
     @Get("/allowedValues/:view/:attribute", true)

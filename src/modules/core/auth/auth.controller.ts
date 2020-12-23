@@ -18,7 +18,8 @@ export default class AuthController extends AbstractController {
 
         const user: AbstractUser = await Enemene.app.config.userModel.findOne({
             where: {
-                username: username
+                username: username,
+                active: true,
             }
         });
 

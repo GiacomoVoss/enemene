@@ -38,6 +38,10 @@ export declare function Reference(label: string | string[],
                                   classGetter: () => ConstructorOf<DataObject<any>>,
                                   required?: boolean): Function;
 
+export declare function ManyToMany(label: string | string[],
+                                   classGetter: () => any,
+                                   throughGetter?: () => any): Function;
+
 export declare function AllowedValues<ENTITY extends DataObject<ENTITY>>(attribute: keyof ENTITY): Function;
 
 export declare namespace EntityFieldType {
@@ -48,12 +52,12 @@ export declare namespace EntityFieldType {
     export const EMAIL = "EMAIL";
     export const DATE = "DATE";
     export const STRING_ARRAY = "STRING_ARRAY";
-    export const NUMBER = "NUMBER";
+    export const INTEGER = "INTEGER";
+    export const DECIMAL = "DECIMAL";
     export const BOOLEAN = "BOOLEAN";
     export const REFERENCE = "REFERENCE";
     export const COMPOSITION = "COMPOSITION";
     export const COLLECTION = "COLLECTION";
-    export const OBJECT = "OBJECT";
     export const CALCULATED = "CALCULATED";
     export const ENUM: (values: any) => string[];
 }

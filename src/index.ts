@@ -1,12 +1,13 @@
+export * from "./modules/core/model";
+export * from "./modules/core/data";
 export * from "./modules/core/action";
 export * from "./modules/core/application";
 export * from "./modules/core/log";
 export * from "./modules/core/view";
 export * from "./modules/core/auth";
-export * from "./modules/core/data";
-export * from "./modules/core/model";
 export * from "./modules/core/filter";
 export * from "./modules/core/import";
 export * from "./modules/core/router";
 export * from "./modules/core/service/uuid.service";
 export {Op} from "sequelize";
+import "reflect-metadata";

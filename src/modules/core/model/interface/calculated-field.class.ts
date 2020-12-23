@@ -5,6 +5,7 @@ export class CalculatedField extends EntityField {
     constructor(public name: string,
                 public label: string | string[],
                 public returnType: EntityFieldType,
+                public fn: Function,
                 public includeFields: string[] = []) {
         super(name, label, EntityFieldType.CALCULATED, false);
         this.isSimpleField = true;

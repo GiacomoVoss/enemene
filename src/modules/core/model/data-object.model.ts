@@ -1,22 +1,15 @@
-import {Column, Model, Table} from "sequelize-typescript";
-import {BuildOptions} from "sequelize";
+import {BuildOptions, Model} from "sequelize";
 import {Dictionary} from "../../../base/type/dictionary.type";
 
 /**
  * Basic abstract entity model.
  */
-@Table({
-    tableName: "_ignore",
-})
 export class DataObject<E> extends Model<DataObject<E>> {
 
     $entity: string;
     $displayPattern: string = "{id}";
     $allowedValues?: Dictionary<Function, keyof this>;
 
-    @Column({
-        primaryKey: true,
-    })
     id: string;
 
     constructor(values?: Dictionary<any, keyof E>, options?: BuildOptions) {

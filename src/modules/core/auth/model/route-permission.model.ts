@@ -12,6 +12,8 @@ import {Enemene} from "../../../..";
 @Entity
 export class RoutePermission extends DataObject<RoutePermission> implements AfterCreateHook {
 
+    $displayPattern = "{method} {route}";
+
     @Field("Route", EntityFieldType.STRING, true)
     route: string;
 

@@ -29,6 +29,11 @@ export interface EnemeneConfig {
     logPath: string;
 
     /**
+     * The path where data files like file uploads should be created in.
+     */
+    dataPath: string;
+
+    /**
      * Database connection configuration.
      */
     db: {

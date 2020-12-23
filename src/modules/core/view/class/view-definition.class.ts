@@ -16,7 +16,7 @@ import {EntityField} from "../../model/interface/entity-field.class";
 import {ReferenceField} from "../../model/interface/reference-field.class";
 import {CollectionField} from "../../model/interface/collection-field.class";
 import {ManyToManyField} from "../../model/interface/many-to-many-field.class";
-import {AbstractUser} from "../../../..";
+import {AbstractUser, UuidService} from "../../../..";
 import {RequestContext} from "../../router/interface/request-context.interface";
 import {ViewDefinitionConfiguration} from "../interface/view-definition-configuration.interface";
 import {ActionDefinition} from "../../action/interface/action-definition.interface";
@@ -47,7 +47,19 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
         this.searchAttributes = configuration?.searchAttributes;
     }
 
-    public getModel(language?: string): Dictionary<serializable> {
+    public getModel(language?: string, path?: string): Dictionary<serializable> {
+        if (path) {
+            const pathTokens: string[] = path.split("/");
+            let token: string = pathTokens.shift();
+            while (UuidService.isUuid(token)) {
+                token = pathTokens.shift();
+            }
+            let subField = this.fields.find((field: ViewFieldDefinition<ENTITY, any>) => field.name === token);
+            if (subField.subView) {
+                return new subField.subView().$view.getModel(language, pathTokens.join("/"));
+            }
+        }
+
         let model: EntityModel = ModelService.getModel(this.entity.name, this.getFields());
         this.fields.forEach((field: ViewFieldDefinition<ENTITY, any>) => {
             if (field.subView) {

@@ -1,6 +1,7 @@
 import {EntityFieldType} from "../enum/entity-field-type.enum";
 import {serializable} from "../../../../base/type/serializable.type";
 import {Dictionary} from "../../../../base/type/dictionary.type";
+import {ModelAttributeColumnOptions} from "sequelize";
 
 export class EntityField {
     public isSimpleField: boolean = true;
@@ -8,7 +9,8 @@ export class EntityField {
     constructor(public name: string,
                 public label: string | string[],
                 public type: EntityFieldType,
-                public required: boolean) {
+                public required: boolean,
+                public options: Partial<ModelAttributeColumnOptions> = {}) {
     }
 
     public toJSON(): any {

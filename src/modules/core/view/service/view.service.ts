@@ -41,6 +41,10 @@ export class ViewService {
         Enemene.log.info(this.constructor.name, `Registered ${chalk.bold(count)} views.`);
     }
 
+    public getAllViews(): string[] {
+        return Object.keys(this.VIEWS);
+    }
+
     /**
      * Add a {@link View} to the view list.
      *
@@ -118,7 +122,7 @@ export class ViewService {
 
     public wrap<ENTITY extends DataObject<ENTITY>>(object: ENTITY, viewDefinition: ViewDefinition<ENTITY>, entity?: string): View<ENTITY> {
         const view: View<ENTITY> = new viewDefinition.viewClass();
-        const entityFields: Dictionary<EntityField> = ModelService.FIELDS[entity ?? object.$entity];
+        const entityFields: Dictionary<EntityField> = ModelService.MODEL[entity ?? object.$entity];
         const viewFields: ViewFieldDefinition<ENTITY, any>[] = viewDefinition.fields;
         for (const viewField of viewFields) {
             const fieldName: string = viewField.name as string;
@@ -136,23 +140,19 @@ export class ViewService {
                     } else if (viewField.isArray) {
                         value = value as any[];
                         view[fieldName] = (value ?? []).map((subValue: any) => {
-                            if (viewField.fieldType.name === "String") {
-                                return typeof subValue === "string" ? subValue : subValue.id;
-                            } else if (viewField.subView) {
+                            if (viewField.subView) {
                                 const subViewDefinition: ViewDefinition<any> = viewField.subView.prototype.$view;
                                 return this.wrap(subValue as unknown as DataObject<ENTITY>, subViewDefinition, subViewDefinition.entity.name) as any;
                             } else {
-                                return null;
+                                return typeof subValue === "string" ? subValue : this.wrap(subValue, this.getSelectionViewDefinition((entityField as ReferenceField).classGetter()), (entityField as ReferenceField).classGetter().name);
                             }
                         });
                     } else if (value !== null && value !== undefined) {
-                        if (viewField.fieldType.name === "String") {
-                            view[fieldName] = typeof value === "string" ? value : value.id;
-                        } else if (viewField.subView) {
+                        if (viewField.subView) {
                             const subViewDefinition: ViewDefinition<any> = viewField.subView.prototype.$view;
                             view[fieldName] = this.wrap(value as unknown as DataObject<ENTITY>, subViewDefinition, subViewDefinition.entity.name) as any;
                         } else {
-                            view[fieldName] = null;
+                            view[fieldName] = typeof value === "string" ? value : this.wrap(value, this.getSelectionViewDefinition((entityField as ReferenceField).classGetter()), (entityField as ReferenceField).classGetter().name);
                         }
                     } else {
                         view[fieldName] = null;
@@ -259,6 +259,9 @@ export class ViewService {
             const name: string = viewField.name;
             if (!entityFields[name]) {
                 throw new Error(`Error validating ${chalk.underline(viewClass.name)}: Field ${chalk.bold(name)} does not exist in entity ${chalk.bold(viewDefinition.entity.name)}.`);
+            }
+            if (!entityFields[name].isSimpleField && !viewField.subView) {
+                // viewField.subView = this.getSelectionViewDefinition((entityFields[name] as ReferenceField).classGetter());
             }
         }
     }

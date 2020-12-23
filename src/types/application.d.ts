@@ -73,7 +73,7 @@ export declare interface EnemeneConfig {
      * The path where all modules like services, controllers and views are.
      */
     modulesPath: string;
-    
+
     /**
      * The log level to show in the log.
      */
@@ -83,6 +83,11 @@ export declare interface EnemeneConfig {
      * The path where log files should be created in.
      */
     logPath: string;
+
+    /**
+     * The path where data files like file uploads should be created in.
+     */
+    dataPath: string;
 
     /**
      * Database connection configuration.

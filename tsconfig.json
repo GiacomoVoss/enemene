@@ -7,7 +7,7 @@
     "emitDecoratorMetadata": true,
     "esModuleInterop": true,
     "types": [
-      "sequelize-typescript"
+      "sequelize"
     ]
   },
   "include": [
