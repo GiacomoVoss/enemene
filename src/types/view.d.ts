@@ -19,19 +19,22 @@ export declare abstract class View<ENTITY extends DataObject<ENTITY>> {
 }
 
 
-export declare function ViewField<ENTITY extends DataObject<ENTITY>, SUBENTITY extends DataObject<SUBENTITY>, SUBVIEW extends View<SUBENTITY>>(position: number, subView?: ConstructorOf<SUBVIEW>, count?: boolean): Function;
+export declare function ViewField<ENTITY extends DataObject<ENTITY>, SUBENTITY extends DataObject<SUBENTITY>, SUBVIEW extends View<SUBENTITY>>(position: number, subView?: ConstructorOf<SUBVIEW>, meta?: any): Function;
 
 export declare class ViewService {
 
     public findAllByView<ENTITY extends DataObject<ENTITY>, VIEW extends View<ENTITY>>(viewClass: ConstructorOf<VIEW>,
                                                                                        filter?: AbstractFilter): Promise<VIEW[]>;
 
+    public findByViewById<ENTITY extends DataObject<ENTITY>, VIEW extends View<ENTITY>>(viewClass: ConstructorOf<VIEW>,
+                                                                                        objectId: uuid): Promise<VIEW>;
+
     public save<ENTITY extends DataObject<ENTITY>>(view: View<ENTITY>,
                                                    viewClass: ConstructorOf<View<ENTITY>>,
                                                    context?: RequestContext<AbstractUser>): Promise<View<ENTITY>>;
 }
 
-export function ViewDefinition<ENTITY extends DataObject<ENTITY>>(entity: ConstructorOf<ENTITY>, configuration?: ViewDefinitionConfiguration<any>): Function;
+export function ViewDefinition<ENTITY extends DataObject<ENTITY>>(entity: () => ConstructorOf<ENTITY>, configuration?: ViewDefinitionConfiguration<any>): Function;
 
 export interface ViewDefinitionConfiguration<ENTITY extends DataObject<ENTITY>> {
     filter?(context: RequestContext<AbstractUser>): AbstractFilter;
@@ -41,4 +44,6 @@ export interface ViewDefinitionConfiguration<ENTITY extends DataObject<ENTITY>> 
     defaultOrder?: Order;
 
     searchAttributes?: string[];
+
+    meta?: any;
 }

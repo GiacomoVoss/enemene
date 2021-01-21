@@ -28,13 +28,20 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
 
     actions: ConstructorOf<AbstractAction>[];
     defaultOrder: Order;
-    entity: ConstructorOf<ENTITY>;
 
     filter?(context: RequestContext<AbstractUser>): AbstractFilter;
 
     searchAttributes?: string[];
 
-    constructor(entity: ConstructorOf<ENTITY>,
+    meta?: object;
+
+    private _entity: () => ConstructorOf<ENTITY>;
+
+    get entity(): ConstructorOf<ENTITY> {
+        return this._entity();
+    }
+
+    constructor(entity: () => ConstructorOf<ENTITY>,
                 viewClass: ConstructorOf<View<ENTITY>>,
                 fields: ViewFieldDefinition<ENTITY, any>[],
                 configuration?: ViewDefinitionConfiguration<ENTITY>) {
@@ -42,9 +49,10 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
         this.fields = fields;
         this.actions = configuration?.actions ?? [];
         this.defaultOrder = configuration?.defaultOrder ?? [["id", "ASC"]];
-        this.entity = entity;
+        this._entity = entity;
         this.filter = configuration?.filter;
         this.searchAttributes = configuration?.searchAttributes;
+        this.meta = configuration?.meta;
     }
 
     public getModel(language?: string, path?: string): Dictionary<serializable> {
@@ -75,6 +83,7 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
         const fields: ViewFieldDefinition<ENTITY, any>[] = [...this.fields];
         fields.sort((a: ViewFieldDefinition<ENTITY, any>, b: ViewFieldDefinition<ENTITY, any>) => a.position - b.position);
         model.$fields = JSON.parse(JSON.stringify(fields));
+        model.$meta = this.meta;
 
         return I18nService.parseEntityModel(model, language);
     }

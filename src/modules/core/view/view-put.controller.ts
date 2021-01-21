@@ -1,7 +1,7 @@
 import {Body, Context, Path, Put, Req} from "../router";
 import {DataObject} from "../model";
 import {AbstractUser, SecureRequest} from "../auth";
-import {DataResponse, UuidService, View} from "../../..";
+import {DataResponse, View} from "../../..";
 import {Dictionary} from "../../../base/type/dictionary.type";
 import {uuid} from "../../../base/type/uuid.type";
 import {serializable} from "../../../base/type/serializable.type";
@@ -10,8 +10,6 @@ import {RequestMethod} from "../router/enum/request-method.enum";
 import {RequestContext} from "../router/interface/request-context.interface";
 import {Controller} from "../router/decorator/controller.decorator";
 import {ViewDefinition} from "./class/view-definition.class";
-import {InputValidationError} from "../validation/error/input-validation.error";
-import {get} from "lodash";
 
 @Controller("view")
 export default class ViewPutController extends AbstractViewController {
@@ -42,41 +40,27 @@ export default class ViewPutController extends AbstractViewController {
         if (!attributePath || !attributePath.length) {
             return this.updateObject(viewName, objectId, data, context);
         }
-        const attributeTokens: string[] = attributePath.split("/");
 
         const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.PUT, context);
-        let object: View<ENTITY> = await this.viewService.findById(viewDefinition, objectId, context);
+        const rootObject: View<ENTITY> = await this.viewService.findById(viewDefinition, objectId, context);
 
-        for (const token of attributeTokens) {
-            if (Array.isArray(object)) {
-                if (UuidService.isUuid(token)) {
-                    object = object.find((obj: any) => obj.id === token);
-                } else if (!isNaN(Number.parseInt(token))) {
-                    object = object[Number.parseInt(token)];
-                } else {
-                    throw new InputValidationError([{
-                        type: "field",
-                        field: "attributePath",
-                        message: `Invalid attribute path: ${attributePath}`,
-                    }]);
-                }
-            } else {
-                object = get(object, token);
-            }
+        let object = rootObject.getByPath(attributePath);
+
+        if (object instanceof View) {
+            object.setValues(data);
+        } else {
+            const subAttributePath: string[] = attributePath.split("/");
+            const lastToken: string = subAttributePath.pop();
+            object = rootObject.getByPath(subAttributePath.join("/"));
+            object.setValues({
+                [lastToken]: data,
+            });
         }
 
-        if (!(object instanceof View)) {
-            throw new InputValidationError([{
-                type: "field",
-                field: "attributePath",
-                message: `Invalid attribute path: ${attributePath}`,
-            }]);
-        }
-
-        object.setValues(data);
+        await this.viewService.save(object, context);
 
         return {
-            data: await this.viewService.save(object, context),
+            data: (await this.viewService.findById(viewDefinition, objectId, context)).getByPath(attributePath),
             model: viewDefinition.getModel(),
         };
     }

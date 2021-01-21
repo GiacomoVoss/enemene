@@ -8,7 +8,7 @@ import {CollectionField} from "../interface/collection-field.class";
 import {ReferenceField} from "../interface/reference-field.class";
 import {EntityFieldType} from "../enum/entity-field-type.enum";
 import {EntityModel} from "../type/entity-model.type";
-import {AbstractUser, DataImport, DataResponse, DataService, Enemene, ImportFieldMapping, ImportReferenceMapping, Role, RoutePermission, UuidService, ViewPermission} from "../../../..";
+import {AbstractUser, DataResponse, DataService, Enemene, File, Role, RoutePermission, UuidService, ViewPermission} from "../../../..";
 import {UnsupportedOperationError} from "../../error/unsupported-operation.error";
 import {RequestContext} from "../../router/interface/request-context.interface";
 import {FileService} from "../../file/service/file.service";
@@ -54,8 +54,6 @@ export class ModelService {
             }
         }
 
-        result[entity].id = new EntityField("id", "ID", EntityFieldType.UUID, true);
-
         return result;
     }
 
@@ -100,15 +98,14 @@ export class ModelService {
             {Role},
             {RoutePermission},
             {ViewPermission},
-            {DataImport},
-            {ImportFieldMapping},
-            {ImportReferenceMapping},
+            {File},
         ];
         const modelFiles: string[] = app.inject(FileService).scanForFilePattern(app.config.modulesPath, /.*\.model\.js/);
         const modules: any[] = await Promise.all(modelFiles.map((filePath: string) => import(filePath)));
 
         [...systemModels, ...modules].forEach((moduleMap: Dictionary<typeof Model>) => {
             const [modelName, module] = Object.entries(moduleMap)[0];
+            ModelService.MODEL[modelName].id = new EntityField("id", "ID", EntityFieldType.UUID, true);
             const fields: Dictionary<EntityField> = ModelService.MODEL[modelName];
             const attributes: ModelAttributes = {
                 id: {
@@ -121,7 +118,7 @@ export class ModelService {
             };
 
             Object.entries(fields)
-                .filter(([_, entityField]) => entityField.isSimpleField)
+                .filter(([_, entityField]) => entityField.isSimpleField && entityField.name !== "id")
                 .forEach(([propertyKey, entityField]) => {
                     const options: ModelAttributeColumnOptions = {
                         type: ModelService.getDataType(entityField.type),
@@ -183,7 +180,11 @@ export class ModelService {
                             constraints: true,
                             foreignKeyConstraint: true
                         });
-                        ModelService.MODEL[modelName][`${propertyKey}Id`] = new EntityField(`${propertyKey}Id`, `${entityField.label} ID`, EntityFieldType.UUID, false);
+                        ModelService.MODEL[modelName][`${propertyKey}Id`] = new EntityField(`${propertyKey}Id`, `${entityField.label} ID`, EntityFieldType.UUID, false, {
+                            references: {
+                                model: entityField.classGetter().name,
+                            }
+                        });
                     } else if (entityField instanceof CollectionField) {
                         if (entityField.composition) {
                             app.log.debug(this.constructor.name, `Registering hasMany (${chalk.bold(modelName + "." + propertyKey)} => ${chalk.bold(entityField.classGetter().name)}).`);
@@ -199,7 +200,11 @@ export class ModelService {
                                 constraints: true,
                                 foreignKeyConstraint: true
                             });
-                            ModelService.MODEL[entityField.classGetter().name][`${propertyKey}Id`] = new EntityField(`${propertyKey}Id`, `${entityField.label} ID`, EntityFieldType.UUID, false);
+                            ModelService.MODEL[entityField.classGetter().name][`${propertyKey}Id`] = new EntityField(`${propertyKey}Id`, `${entityField.label} ID`, EntityFieldType.UUID, false, {
+                                references: {
+                                    model: entityField.classGetter().name,
+                                }
+                            });
                         } else {
                             app.log.debug(this.constructor.name, `Registering belongsToMany (${chalk.bold(modelName + "." + propertyKey)} => ${chalk.bold(entityField.classGetter().name)}).`);
                             db.model(modelName).belongsToMany(db.model(entityField.classGetter().name), {

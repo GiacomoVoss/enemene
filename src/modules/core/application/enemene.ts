@@ -39,7 +39,8 @@ export class Enemene {
         this.express = express();
         this.devMode = process.env.NODE_ENV === "development";
         this.express.use(allowHeaders);
-        this.express.use(bodyParser.json());
+        this.express.use(bodyParser.urlencoded({limit: "50mb"}));
+        this.express.use(bodyParser.json({limit: "50mb"}));
         this.log = Enemene.log;
         this.log[config.logLevel.toLowerCase()]("Server", "Log level: " + config.logLevel.toUpperCase());
         this.config.port = `${this.normalizePort(config.port)}`;

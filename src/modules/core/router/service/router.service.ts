@@ -9,7 +9,7 @@ import {RequestMethod} from "../enum/request-method.enum";
 import {RuntimeError} from "../../application/error/runtime.error";
 import {SecureRequest} from "../../auth/interface/secure-request.interface";
 import {PermissionService} from "../../auth/service/permission.service";
-import {Enemene} from "../../../..";
+import {Enemene, FileController} from "../../../..";
 import {InputValidationError} from "../../validation/error/input-validation.error";
 import {Redirect} from "../class/redirect.class";
 import {ConstructorOf} from "../../../../base/constructor-of";
@@ -24,6 +24,7 @@ import ViewPutController from "../../view/view-put.controller";
 import ViewDeleteController from "../../view/view-delete.controller";
 import {ModelController} from "../../model/model.controller";
 import {FileService} from "../../file/service/file.service";
+import multer from "multer";
 
 export class RouterService {
 
@@ -33,6 +34,7 @@ export class RouterService {
         [RequestMethod.GET]: {},
         [RequestMethod.PUT]: {},
         [RequestMethod.POST]: {},
+        [RequestMethod.POSTFILE]: {},
         [RequestMethod.DELETE]: {},
     };
 
@@ -40,7 +42,10 @@ export class RouterService {
 
     private permissionService: PermissionService = Enemene.app.inject(PermissionService);
 
+    private multer;
+
     async init(): Promise<void> {
+        this.multer = multer({dest: Enemene.app.config.dataPath});
         const controllerFiles: string[] = this.fileService.scanForFilePattern(Enemene.app.config.modulesPath, /.*\.controller\.js/);
         const controllerModules: Dictionary<ConstructorOf<AbstractController>>[] = await Promise.all(controllerFiles.map((filePath: string) => import(filePath)));
         controllerModules.forEach((moduleMap: Dictionary<ConstructorOf<AbstractController>>) => {
@@ -53,6 +58,7 @@ export class RouterService {
 
         [AuthController,
             ActionController,
+            FileController,
             ViewGetController,
             ViewPostController,
             ViewPutController,
@@ -76,6 +82,7 @@ export class RouterService {
     public register(router: ConstructorOf<AbstractController>, pathDefinition: PathDefinition): void {
         const moduleName: string = router.prototype.$path;
         let fullPath: string = `/${moduleName}`;
+        pathDefinition.controller = router;
         if (pathDefinition.path === "/") {
             this.paths[pathDefinition.method][fullPath] = pathDefinition;
             return;
@@ -85,7 +92,6 @@ export class RouterService {
             fullPath += "/";
         }
         fullPath += pathDefinition.path;
-        pathDefinition.controller = router;
         this.paths[pathDefinition.method][fullPath] = pathDefinition;
     }
 
@@ -110,6 +116,18 @@ export class RouterService {
                         break;
                     case RequestMethod.POST:
                         app.post(`/api${path}`, ...handlers, this.logError);
+                        break;
+                    case RequestMethod.POSTFILE:
+                        app.post(`/api${path}`,
+                            authenticatedGuard,
+                            this.multer.single("file"),
+                            (req: SecureRequest, res: Response, next: NextFunction) => {
+                                this.permissionService.checkRoutePermission(path, pathDefinition, req.payload);
+                                next();
+                            },
+                            (req, res, next) => this.handle(req as SecureRequest, res, next, pathDefinition),
+                            this.logError
+                        );
                         break;
                     case RequestMethod.PUT:
                         app.put(`/api${path}`, ...handlers, this.logError);

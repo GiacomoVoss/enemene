@@ -16,45 +16,71 @@ import {UnsupportedOperationError} from "../error/unsupported-operation.error";
 import {RequestContext} from "../router/interface/request-context.interface";
 import {Controller} from "../router/decorator/controller.decorator";
 import {ViewDefinition} from "./class/view-definition.class";
-import {get} from "lodash";
-import {UuidService} from "../../..";
-import {InputValidationError} from "../validation/error/input-validation.error";
+import {get, set} from "lodash";
+import {InvalidAttributePathError} from "./error/invalid-attribute-path.error";
 
 
 @Controller("view")
 export default class ViewGetController extends AbstractViewController {
 
-    private filterFields<VIEW extends View<any>>(object: VIEW | VIEW[], fieldsString?: string): Dictionary<serializable> | Dictionary<serializable>[] {
-        if (!fieldsString) {
-            if (Array.isArray(object)) {
-                return object.map(obj => obj.toJSON());
-            } else {
-                return object.toJSON();
+    private dotize(jsonobj: any, prefix?: string) {
+        var newobj = {};
+
+        function recurse(o, p) {
+            for (const f in o) {
+                const pre = (p === undefined ? "" : p + ".");
+                if (o[f] && typeof o[f] === "object") {
+                    newobj = recurse(o[f], pre + f);
+                } else {
+                    newobj[pre + f] = o[f];
+                }
             }
+            return newobj;
+        }
+
+        return recurse(jsonobj, prefix);
+    }
+
+    private filterFields<VIEW extends View<any>>(object: VIEW, fieldsString?: string): Dictionary<serializable> | Dictionary<serializable>[] {
+        const data: any = object.toJSON();
+        if (!fieldsString) {
+            return data;
         }
 
         const fields: string[] = fieldsString.split(",");
-        const values: Dictionary<serializable> | Dictionary<serializable>[] = Array.isArray(object) ? [] : {};
+        const fieldsMap: any = fields.reduce((map: any, field: string) => {
+            set(map, field.trim(), true);
+            return map;
+        }, {});
 
-        for (let field of fields) {
-            if (field.includes(".")) {
-                const fieldTokens = field.split(".");
-                const firstToken = fieldTokens.shift();
-                if (firstToken.includes("#")) {
-                    throw new InputValidationError([]);
+        const values: Dictionary<serializable> = {};
+
+        for (let [field, subFields] of Object.entries(fieldsMap)) {
+            let value: any = get(object, field);
+            if (Object.keys(subFields).includes("$count")) {
+                if (Array.isArray(value) || value === undefined) {
+                    values[field + ".$count"] = (value ?? []).length;
+                } else {
+                    throw new InvalidAttributePathError(field);
                 }
-            } else {
-                let actualField = field;
-                if (field.includes("#")) {
-                    actualField = field.replace("#", "");
-                }
-                let value: any = get(object, actualField);
-                if (field.includes("#") && Array.isArray(value)) {
-                    values[field] = value.length;
-                }
+            } else if (typeof subFields === "boolean") {
                 values[field] = value;
+            } else if (Array.isArray(value)) {
+                if (!value.length) {
+                    values[field] = [];
+                } else if (typeof value[0] === "object") {
+                    const subFieldsString: string = Object.keys(this.dotize(subFields)).join(",");
+                    values[field] = value.map(v => this.filterFields(v, subFieldsString));
+                }
+            } else if (typeof value === "object") {
+                const subFieldsString: string = Object.keys(this.dotize(subFields)).join(",");
+                values[field] = this.filterFields(value, subFieldsString);
             }
         }
+
+        values.id = data.id;
+        values.$entity = data.$entity;
+        values.$displayPattern = data.$displayPattern;
 
         return values;
     }
@@ -136,30 +162,8 @@ export default class ViewGetController extends AbstractViewController {
 
         const view: View<ENTITY> = await this.viewService.findById(viewDefinition, objectId, context);
 
-        const attributeTokens: string[] = attributePath.split("/");
-
-        let data = view;
-
-        for (const token of attributeTokens) {
-            if (Array.isArray(data)) {
-                if (UuidService.isUuid(token)) {
-                    data = data.find((obj: any) => obj.id === token);
-                } else if (!isNaN(Number.parseInt(token))) {
-                    data = data[Number.parseInt(token)];
-                } else {
-                    throw new InputValidationError([{
-                        type: "field",
-                        field: "attributePath",
-                        message: `Invalid attribute path: ${attributePath}`,
-                    }]);
-                }
-            } else {
-                data = get(data, token);
-            }
-        }
-
         return {
-            data,
+            data: view.getByPath(attributePath),
             model: viewDefinition.getModel(undefined, attributePath),
         };
     }

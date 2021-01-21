@@ -14,4 +14,6 @@ export class ViewDefinitionConfiguration<ENTITY extends DataObject<ENTITY>> {
     defaultOrder?: Order;
 
     searchAttributes?: string[];
+
+    meta?: any;
 }

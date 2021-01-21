@@ -8,7 +8,7 @@ export class ViewFieldDefinition<ENTITY extends DataObject<ENTITY>, SUBENTITY ex
                 public fieldType?: any,
                 public subView?: ConstructorOf<View<SUBENTITY>>,
                 public isArray: boolean = false,
-                public isCount: boolean = false) {
+                private meta?: any) {
     }
 
     toJSON() {
@@ -17,7 +17,7 @@ export class ViewFieldDefinition<ENTITY extends DataObject<ENTITY>, SUBENTITY ex
             name: this.name,
             subView: this.subView?.name,
             isArray: this.isArray,
-            isCount: this.isCount,
+            meta: this.meta,
         };
     }
 }

@@ -7,11 +7,3 @@ export declare interface ConstructorOf<CLASS> {
 export declare type uuid = string;
 
 export declare type serializable = string | number | boolean | Date | object | string[] | number[] | boolean[] | Date[] | object[] | null;
-
-export class RuntimeError extends Error {
-    type: string;
-
-    statusCode?: number;
-
-    public toJSON(): object;
-}

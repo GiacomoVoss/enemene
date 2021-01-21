@@ -52,6 +52,10 @@ export class ActionService {
             throw new Error(`Duplicate action name ${chalk.bold(name)}.`);
         }
 
+        if (!actionClass.prototype.$action) {
+            throw new Error(`Missing @Action annotation on action ${chalk.bold(name)}.`);
+        }
+
         this.ACTIONS[name] = actionClass;
     }
 

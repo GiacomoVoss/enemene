@@ -1,6 +1,8 @@
 import {serializable} from "./base";
+import {Dictionary} from "../base/type/dictionary.type";
 
 export abstract class AbstractFilter {
+    public abstract evaluate(object: Dictionary<serializable>): boolean;
 }
 
 export declare class Filter {

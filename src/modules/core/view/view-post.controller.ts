@@ -10,7 +10,7 @@ import {ViewDefinition} from "./class/view-definition.class";
 import {uuid} from "../../../enemene";
 import {get} from "lodash";
 import {RequestContext} from "../router/interface/request-context.interface";
-import {InputValidationError} from "../validation/error/input-validation.error";
+import {InvalidAttributePathError} from "./error/invalid-attribute-path.error";
 
 @Controller("view")
 export default class ViewPostController extends AbstractViewController {
@@ -28,62 +28,6 @@ export default class ViewPostController extends AbstractViewController {
             model: viewDefinition.getModel(),
         };
     }
-
-    // @Post("/:view/:id/:attribute", true)
-    // async createCollectionObject<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
-    //                                                                 @Path("id") objectId: uuid,
-    //                                                                 @Path("attribute") collectionField: keyof ENTITY,
-    //                                                                 @Body() data: Dictionary<serializable>,
-    //                                                                 @Context() context: Dictionary<serializable>): Promise<DataResponse<ENTITY>> {
-    //     const baseView: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.POST, context);
-    //     const viewField: ViewFieldDefinition<ENTITY, any> | undefined = baseView.fields.find(field => field.name === collectionField);
-    //     if (!viewField || !viewField.isArray) {
-    //         throw new UnsupportedOperationError(`Field ${collectionField} not found.`);
-    //     }
-    //
-    //     const fields: string[] = baseView.getFields();
-    //
-    //     const baseObject: DataObject<ENTITY> = await DataService.findNotNullById(baseView.entity, objectId, this.viewService.getFindOptions(baseView, context, {
-    //         include: [{model: viewField.subView.prototype.$view.entity, as: collectionField as string}]
-    //     }));
-    //     const baseModel: Dictionary<EntityField, keyof ENTITY> = ModelService.getFields(baseView.entity.name);
-    //
-    //     const subFields: string[] = fields
-    //         .filter(field => field.startsWith(`${String(collectionField)}.`))
-    //         .map((field: string) => field.substr(field.indexOf(".") + 1));
-    //     const filteredData: Dictionary<serializable> = pick(data, subFields);
-    //     const fieldModel = baseModel[collectionField];
-    //
-    //     let object: DataObject<ENTITY>;
-    //     const transaction = await Enemene.app.db.transaction();
-    //     try {
-    //         if (fieldModel instanceof CollectionField) {
-    //             filteredData[fieldModel.foreignKey] = objectId;
-    //             object = await DataService.create(fieldModel.classGetter(), filteredData, context, undefined, transaction);
-    //             // await baseObject.$add(fieldModel.name as any, object, {
-    //             //     transaction,
-    //             // });
-    //         } else if (fieldModel instanceof CompositionField) {
-    //             filteredData[fieldModel.foreignKey] = objectId;
-    //             object = await DataService.create(fieldModel.classGetter(), filteredData, context, undefined, transaction);
-    //             // await baseObject.$set(fieldModel.name as any, object, {
-    //             //     transaction,
-    //             // });
-    //         }
-    //         transaction.commit();
-    //     } catch (e) {
-    //         transaction.rollback();
-    //         throw e;
-    //     }
-    //
-    //     const resultObject: View<any> = this.viewService.wrap(object, viewField.subView.prototype.$view);
-    //
-    //     return {
-    //         data: resultObject,
-    //         model: ModelService.getModel(object.$entity, subFields),
-    //     };
-    // }
-
 
     @Post("/:view/:id/*", true)
     async createInPath<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
@@ -108,11 +52,7 @@ export default class ViewPostController extends AbstractViewController {
                 } else if (!isNaN(Number.parseInt(token))) {
                     object = object[Number.parseInt(token)];
                 } else {
-                    throw new InputValidationError([{
-                        type: "field",
-                        field: "attributePath",
-                        message: `Invalid attribute path: ${attributePath}`,
-                    }]);
+                    throw new InvalidAttributePathError(attributePath);
                 }
             } else {
                 object = get(object, token);
@@ -121,35 +61,33 @@ export default class ViewPostController extends AbstractViewController {
 
 
         if (!(object instanceof View)) {
-            throw new InputValidationError([{
-                type: "field",
-                field: "attributePath",
-                message: `Invalid attribute path: ${attributePath}`,
-            }]);
+            throw new InvalidAttributePathError(attributePath);
         }
 
         const collectionViewField: ViewFieldDefinition<any, any> | undefined = object.$view.fields.find(viewField => viewField.isArray && viewField.name === collectionAttribute);
 
         if (!collectionViewField) {
-            throw new InputValidationError([{
-                type: "field",
-                field: "attributePath",
-                message: `Invalid attribute path: ${attributePath}`,
-            }]);
+            throw new InvalidAttributePathError(attributePath);
         }
 
+        const newObjectId: uuid = UuidService.getUuid();
         const newSubView: View<any> = new collectionViewField.subView();
-        newSubView.setValues(data);
+        newSubView.setValues({
+            ...data,
+            id: newObjectId,
+        });
         object.setValues({
             ...object,
             [collectionAttribute]: [
                 ...(object[collectionAttribute] ?? []),
-                data,
+                newSubView.toJSON(),
             ],
         });
+        console.log(object);
 
+        const rootObject = await this.viewService.save(object, context);
         return {
-            data: await this.viewService.save(object, context),
+            data: rootObject.getByPath(`${attributePath}/${newObjectId}`),
             model: viewDefinition.getModel(),
         };
     }

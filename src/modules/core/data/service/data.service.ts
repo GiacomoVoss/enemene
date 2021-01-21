@@ -4,25 +4,20 @@ import {ValidationService} from "../../validation/service/validation.service";
 import {UnauthorizedError} from "../../auth/error/unauthorized.error";
 import {CountOptions, FindOptions} from "sequelize";
 import {UuidService} from "../../service/uuid.service";
-import {ModelService} from "../../model/service/model.service";
-import {EntityField} from "../../model/interface/entity-field.class";
-import {CollectionField} from "../../model/interface/collection-field.class";
-import {ReferenceField} from "../../model/interface/reference-field.class";
-import {CompositionField} from "../../model/interface/composition-field.class";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {serializable} from "../../../../base/type/serializable.type";
 import {Enemene} from "../../application/enemene";
 import {OrderItem} from "sequelize/types/lib/model";
-import {uuid} from "../../../../base/type/uuid.type";
 import {AfterCreateHook, BeforeCreateHook} from "..";
 import {Validate} from "../../validation/class/validate.class";
 import {BeforeDeleteHook} from "../interface/before-delete-hook.interface";
 import {Transaction} from "sequelize/types/lib/transaction";
 import {RequestContext} from "../../router/interface/request-context.interface";
 import {AbstractUser} from "../../auth";
-import {isEmpty} from "lodash";
 import {AbstractFilter, FilterService} from "../../filter";
 import {DataFindOptions} from "../interface/data-find-options.interface";
+import {DataHelperService} from "./data-helper.service";
+import {uuid} from "../../../../base/type/uuid.type";
 
 /**
  * Service to retrieve data from the model.
@@ -133,7 +128,7 @@ export class DataService {
     }
 
 
-    public static async findById<ENTITY extends DataObject<ENTITY>>(clazz: any, id: number | string, options?: FindOptions, transaction?: Transaction): Promise<ENTITY | null> {
+    public static async findById<ENTITY extends DataObject<ENTITY>>(clazz: any, id: number | string, options: FindOptions = {}, transaction?: Transaction): Promise<ENTITY | null> {
         const object: ENTITY = await clazz.findByPk(id, {
             ...options,
             transaction,
@@ -156,9 +151,10 @@ export class DataService {
     public static async update<T extends DataObject<T>>(clazz: any, object: DataObject<T>, data: any, context: RequestContext<AbstractUser>, transaction?: Transaction): Promise<DataObject<T>> {
         const t: Transaction = transaction ?? await Enemene.app.db.transaction();
         try {
-            object = await DataService.populate(data, t, context, object);
-            ValidationService.validate(object);
-            await object.save({transaction: t});
+            const changedObject: DataObject<T> = await DataHelperService.populate(object, data, t);
+            changedObject.isNewRecord = false;
+            // ValidationService.validate(object);
+            await changedObject.save({transaction: t});
             if (!transaction) {
                 await t.commit();
             }
@@ -178,17 +174,6 @@ export class DataService {
             if ((object as unknown as BeforeDeleteHook).onBeforeDelete) {
                 await (object as unknown as BeforeDeleteHook).onBeforeDelete(context);
             }
-
-            const entityFields: EntityField[] = Object.values(ModelService.MODEL[object.$entity]);
-            await Promise.all(entityFields
-                .filter((field: EntityField) => field.type === "COMPOSITION")
-                .map(async (field: CompositionField) => {
-                    const subObject: DataObject<any> = object[field.name] ?? await DataService.findById(field.classGetter(), object[field.foreignKey], undefined, t);
-                    if (subObject) {
-                        await DataService.delete(subObject, context, t);
-                    }
-                })
-            );
             await object.destroy({transaction: t});
             if (!transaction) {
                 await t.commit();
@@ -216,34 +201,24 @@ export class DataService {
         let object: T = null;
         const t = transaction ?? await Enemene.app.db.transaction();
         try {
-            object = await DataService.populate({
-                ...data,
-                $entity: clazz.name,
-            }, t);
-
-            ValidationService.validate(object as DataObject<T>);
-
+            object = clazz.build();
+            const changedObject: DataObject<T> = await DataHelperService.populate(object, data, t);
+            // ValidationService.validate(object as DataObject<T>);
             if ((object as unknown as BeforeCreateHook).onBeforeCreate) {
                 await (object as unknown as BeforeCreateHook).onBeforeCreate(context);
             }
 
-            await (object as DataObject<T>).save({transaction: t});
-
-
-            const where = {};
-            if (options.where) {
-                clazz.primaryKeyAttributes.forEach(attribute => where[attribute] = object[attribute]);
-            }
-            const newObject: T = await this.findById(clazz, object.id as uuid, {
-                where: {
-                    ...where,
-                    ...(options.where ?? {})
-                },
-            }, t);
-
-            if (!newObject) {
-                throw new UnauthorizedError();
-            }
+            await changedObject.save({transaction: t});
+            //
+            // const where = {};
+            // if (options.where) {
+            //     clazz.primaryKeyAttributes.forEach(attribute => where[attribute] = object[attribute]);
+            // }
+            const newObject: T = await this.findById(clazz, changedObject.id as uuid, options, t);
+            //
+            // if (!newObject) {
+            //     throw new ObjectNotFoundError();
+            // }
 
             if ((object as unknown as AfterCreateHook).onAfterCreate) {
                 await (object as unknown as AfterCreateHook).onAfterCreate(context);
@@ -279,10 +254,7 @@ export class DataService {
             let dataObjects: Dictionary<serializable>[] = [];
             for (const dataObject of data) {
                 dataObject.id = UuidService.getUuid();
-                const object: T = await DataService.populate({
-                    ...dataObject,
-                    $entity: clazz.name,
-                }, t);
+                const object: T = clazz.build(dataObject);
                 ValidationService.validate(object, validation);
                 dataObjects.push(dataObject);
             }
@@ -339,65 +311,5 @@ export class DataService {
         }
 
         return findOptions;
-    }
-
-    public static async populate<T extends DataObject<T>>(data: Dictionary<any>, transaction: Transaction, context?: RequestContext<AbstractUser>, originalData?: T): Promise<T> {
-        let object: T;
-        if (originalData) {
-            object = originalData;
-        } else {
-            object = Enemene.app.db.model(data.$entity).build({
-                id: UuidService.getUuid(),
-                $entity: data.$entity,
-            }, {
-                isNewRecord: true,
-            }) as T;
-        }
-        const fields: Dictionary<EntityField, keyof T> = ModelService.getFields(data.$entity);
-        for (const [key, field] of Object.entries(fields)) {
-            if (field instanceof CompositionField) {
-                const subObjectData: Dictionary<any> = data[key] ?? data[field.foreignKey] ?? originalData?.[key] ?? originalData?.[field.foreignKey];
-                if (subObjectData) {
-                    if (typeof subObjectData === "object" && !isEmpty(subObjectData)) {
-                        // We got an object, check if the object exists or we need to create a new one.
-                        if (subObjectData.id) {
-                            let subObject: DataObject<any> = await DataService.findNotNullById(field.classGetter(), subObjectData.id, undefined, transaction);
-                            subObject = await DataService.update(field.classGetter(), subObject, subObjectData, context, transaction);
-                            object[field.foreignKey] = subObjectData.id;
-                            object[field.name] = subObjectData;
-                        } else {
-                            const subObject = await DataService.create(field.classGetter(), subObjectData, context, undefined, transaction);
-                            object[field.foreignKey] = subObject.id;
-                            object[field.name] = subObject;
-                        }
-                    } else if (typeof subObjectData === "string") {
-                        object[field.foreignKey] = subObjectData;
-                        object[field.name] = await DataService.findNotNullById(field.classGetter(), subObjectData, undefined, transaction);
-                    }
-                }
-            } else if (field instanceof ReferenceField) {
-                const subObjectData: uuid | Dictionary<serializable> = data[key] ?? data[field.foreignKey] ?? originalData?.[key] ?? originalData?.[field.foreignKey];
-                if (subObjectData) {
-                    if (typeof subObjectData === "string") {
-                        const referenceObject = await DataService.findNotNullById(field.classGetter(), subObjectData, undefined, transaction);
-                        object[field.foreignKey as keyof T] = referenceObject.id as any;
-                        object[key as keyof T] = referenceObject as any;
-                    } else {
-                        const referenceObject = await DataService.findNotNullById(field.classGetter(), subObjectData.id as string, undefined, transaction);
-                        object[field.foreignKey as keyof T] = referenceObject.id as any;
-                        object[key as keyof T] = referenceObject as any;
-                    }
-                }
-            } else if (field instanceof CollectionField && data[key]) {
-                console.log(data[key]);
-                object[key as keyof T] = await Promise.all(data[key].map(async d => {
-                    const collectionObject = await DataService.populate(d, transaction, context, originalData);
-                })) as any;
-            } else if (data[key] !== undefined) {
-                object[key as keyof T] = data[key];
-            }
-        }
-
-        return object;
     }
 }

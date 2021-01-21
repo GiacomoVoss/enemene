@@ -17,6 +17,10 @@ import {UnsupportedOperationError} from "../../error/unsupported-operation.error
 import {RequestContext} from "../../router/interface/request-context.interface";
 import {FileService} from "../../file/service/file.service";
 import {ViewDefinition} from "../class/view-definition.class";
+import {uuid} from "../../../../base/type/uuid.type";
+import {CompositionField} from "../../model/interface/composition-field.class";
+import {CollectionField} from "../../model/interface/collection-field.class";
+import {ValidationService} from "../../validation/service/validation.service";
 
 /**
  * Service for handling views for data manipulation.
@@ -83,6 +87,13 @@ export class ViewService {
         return data.map((object: DataObject<ENTITY>) => this.wrap(object, viewDefinition)) as VIEW[];
     }
 
+    public async findByViewById<ENTITY extends DataObject<ENTITY>, VIEW extends View<ENTITY>>(viewClass: ConstructorOf<VIEW>,
+                                                                                              objectId: uuid): Promise<VIEW> {
+        const viewDefinition: ViewDefinition<ENTITY> = viewClass.prototype.$view;
+        const data: DataObject<ENTITY> = await DataService.findById(viewDefinition.entity, objectId, this.getFindOptions(viewDefinition));
+        return this.wrap(data, viewDefinition) as VIEW;
+    }
+
     public async findById<ENTITY extends DataObject<ENTITY>>(viewDefinition: ViewDefinition<ENTITY>,
                                                              id: string,
                                                              context: RequestContext<AbstractUser> = {}): Promise<View<ENTITY>> {
@@ -94,21 +105,77 @@ export class ViewService {
                                                          context: RequestContext<AbstractUser> = {}): Promise<View<ENTITY>> {
         const t: Transaction = await Enemene.app.db.transaction();
         try {
-            const viewDefinition: ViewDefinition<ENTITY> = view.$view;
-            const where: FindOptions = viewDefinition.filter ? FilterService.toSequelize(viewDefinition.filter(context), viewDefinition.entity) : {};
-            const object: DataObject<ENTITY> | null = await DataService.findById(viewDefinition.entity, view.id, where, t);
-            let updatedObject: DataObject<ENTITY>;
-            if (object) {
-                updatedObject = await DataService.update(viewDefinition.entity, object, view.toJSON(), context, t);
-            } else {
-                updatedObject = await DataService.create(viewDefinition.entity, view.toJSON(), context, where, t);
-            }
+            const viewId: uuid = await this.saveInTransaction(t, view, context);
             await t.commit();
-            return this.findById(viewDefinition, updatedObject.id, context);
+            return this.findById(view.$view, viewId, context);
         } catch (e) {
             await t.rollback();
             throw e;
         }
+    }
+
+    private async saveInTransaction<ENTITY extends DataObject<ENTITY>>(transaction: Transaction,
+                                                                       view: View<ENTITY>,
+                                                                       context: RequestContext<AbstractUser> = {}): Promise<uuid> {
+        let object: DataObject<ENTITY> | undefined = view.id ? await DataService.findById(view.$view.entity, view.id, this.getFindOptions(view.$view, context), transaction) : undefined;
+        const rawObject: any = object?.toJSON() ?? {};
+        const fields: Dictionary<EntityField, keyof ENTITY> = ModelService.getFields(view.$view.entity.name);
+        for (const [key, newValue] of Object.entries(view)) {
+            if (newValue !== undefined) {
+                const field: EntityField = fields[key];
+                if (field instanceof CompositionField) {
+                    const myValue: DataObject<any> | undefined = object.get(key) as DataObject<any> | undefined;
+                    if (newValue === null && myValue) {
+                        // Remove object:
+                        view[key] = null;
+                        object.set(field.foreignKey as any, null);
+                        rawObject[key] = null;
+                    } else if (newValue && myValue) {
+                        // Change object content or save new object:
+                        const newValueId: uuid = await this.saveInTransaction(transaction, newValue, context);
+                        rawObject[key] = newValue.toJSON();
+                        if (newValueId !== myValue.id) {
+                            object.set(field.foreignKey as any, newValueId);
+                            rawObject[field.foreignKey] = newValueId;
+                        }
+                    }
+                } else if (field instanceof ReferenceField) {
+                    const id: string = typeof newValue === "string" ? newValue : newValue.id;
+                    object.set(field.foreignKey as any, id);
+                    rawObject[field.foreignKey] = id;
+                } else if (field instanceof CollectionField) {
+                    const myValue: DataObject<any>[] = object.get(key) as DataObject<any>[] ?? [];
+                    const newData: string[] = [];
+                    if (newValue == null) {
+                        object.set(key as any, []);
+                        rawObject[key] = [];
+                    } else {
+                        for (const d of newValue) {
+                            let id: string = typeof d === "string" ? d : d.id;
+                            if (field.composition) {
+                                id = await this.saveInTransaction(transaction, d, context);
+                            }
+                            newData.push(id);
+                        }
+                    }
+
+                    const deletedObjects = myValue.filter((obj: DataObject<any>) => !newData.includes(obj.id));
+                    if (field.composition) {
+                        await Promise.all(deletedObjects.map(async deletedObject => await deletedObject.destroy({transaction})));
+                    }
+                    rawObject[key] = newData;
+                } else if (view[key] !== undefined) {
+                    rawObject[key] = view[key];
+                }
+            }
+        }
+
+        ValidationService.validate(rawObject);
+        console.log(object);
+
+        await object.save({transaction});
+
+        return object.id;
     }
 
     public getViewDefinition(viewName: string): ViewDefinition<any> {
@@ -135,9 +202,7 @@ export class ViewService {
                 if (entityField.isSimpleField) {
                     view[fieldName] = (object.toJSON ? object.toJSON()?.[key] : object[key]) ?? null;
                 } else {
-                    if (viewField.isCount) {
-                        view[fieldName] = (value ?? []).length;
-                    } else if (viewField.isArray) {
+                    if (viewField.isArray) {
                         value = value as any[];
                         view[fieldName] = (value ?? []).map((subValue: any) => {
                             if (viewField.subView) {
@@ -209,7 +274,10 @@ export class ViewService {
     public addIncludeAndAttributes(entity: string, fields: ViewFieldDefinition<any, any>[], findOptions: FindOptions = {}): void {
         const model = ModelService.getFields(entity);
         if (!findOptions.attributes) {
-            findOptions.attributes = ["id"];
+            findOptions.attributes = [];
+        }
+        if (!(findOptions.attributes as string[]).includes("id")) {
+            (findOptions.attributes as string[]).push("id");
         }
         if (!findOptions.include) {
             findOptions.include = [];
@@ -242,8 +310,6 @@ export class ViewService {
                         viewDefinition.fields,
                         include,
                     );
-                } else if (field.isCount) {
-                    include.attributes = ["id"];
                 } else {
                     include.attributes = ModelService.getDisplayPatternFields((entityField as ReferenceField).classGetter().name).map((ef: EntityField) => ef.name);
                 }
@@ -268,7 +334,7 @@ export class ViewService {
 
     public getSelectionViewDefinition<ENTITY extends DataObject<ENTITY>>(entity: ConstructorOf<ENTITY>): ViewDefinition<ENTITY> {
         return new ViewDefinition(
-            entity,
+            () => entity,
             class SelectionView extends View<ENTITY> {
                 public $view: any = {
                     entity: entity.name,
