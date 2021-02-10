@@ -1,14 +1,13 @@
 import {EntityField} from "../interface/entity-field.class";
 import {Dictionary} from "../../../../base/type/dictionary.type";
-import {camelCase, merge, snakeCase, uniq} from "lodash";
+import {camelCase, snakeCase} from "lodash";
 import {DataObject} from "../data-object.model";
 import {ManyToManyField} from "../interface/many-to-many-field.class";
 import {CompositionField} from "../interface/composition-field.class";
 import {CollectionField} from "../interface/collection-field.class";
 import {ReferenceField} from "../interface/reference-field.class";
 import {EntityFieldType} from "../enum/entity-field-type.enum";
-import {EntityModel} from "../type/entity-model.type";
-import {AbstractUser, DataResponse, DataService, Enemene, File, Role, RoutePermission, UuidService, ViewPermission} from "../../../..";
+import {AbstractFilter, AbstractUser, Enemene, File, Filter, Role, RoutePermission, UuidService, ViewPermission} from "../../../..";
 import {UnsupportedOperationError} from "../../error/unsupported-operation.error";
 import {RequestContext} from "../../router/interface/request-context.interface";
 import {FileService} from "../../file/service/file.service";
@@ -19,6 +18,7 @@ import * as bcrypt from "bcrypt";
 import {genSaltSync} from "bcrypt";
 import {CalculatedField} from "../interface/calculated-field.class";
 import {BelongsToManyOptions} from "sequelize/types/lib/associations";
+import {ConstructorOf} from "../../../../base/constructor-of";
 
 export class ModelService {
 
@@ -28,33 +28,14 @@ export class ModelService {
         return (ModelService.MODEL[entity] || {}) as Dictionary<EntityField, keyof T>;
     }
 
-    public static getModel(entity: string, requestedFields: string[]): EntityModel {
-        return {
-            ...this.getModelInternal(entity, requestedFields),
-            $root: entity,
-        };
-    }
-
-    private static getModelInternal(entity: string, requestedFields: string[]): Dictionary<Dictionary<EntityField>> {
-        let result: Dictionary<Dictionary<EntityField>> = {
-            [entity]: {},
-        };
-        const requestedBaseFields: string[] = uniq(requestedFields.map((field: string) => field.replace(/\..*/, "")));
+    public static getModel(entity: string, requestedFields: string[]): Dictionary<EntityField> {
         const modelFields: Dictionary<EntityField> = ModelService.MODEL[entity];
-        const fields: EntityField[] = Object.values(modelFields)
-            .filter((field: EntityField) => requestedBaseFields.includes(field.name) || requestedBaseFields.includes("*"));
-        for (const field of fields) {
-            const key: keyof DataObject<any> = field.name as keyof DataObject<any>;
-            result[entity][field.name] = field;
-            if (field instanceof ManyToManyField || field instanceof CompositionField || field instanceof CollectionField || field instanceof ReferenceField) {
-                let requestedSubFields: string[] = requestedFields
-                    .filter((f: string) => f.startsWith(`${key}.`))
-                    .map((f: string) => f.substr(f.indexOf(".") + 1));
-                result = merge(result, this.getModelInternal(field.classGetter().name, requestedSubFields));
-            }
-        }
-
-        return result;
+        return Object.values(modelFields)
+            .filter((field: EntityField) => requestedFields.includes(field.name) || requestedFields.includes("*"))
+            .reduce((map: Dictionary<EntityField>, field: EntityField) => {
+                map[field.name] = field;
+                return map;
+            }, {});
     }
 
     public static getDisplayPatternFields(entity: string): EntityField[] {
@@ -65,30 +46,25 @@ export class ModelService {
             fields = matches.map((token: string) => token.replace(/[}{]/g, ""));
         }
         fields.push("id");
-        return Object.values(this.getModel(entity, fields)[entity]);
+        return Object.values(this.getModel(entity, fields));
     }
 
-    public static async getAllowedValues<ENTITY extends DataObject<ENTITY>, SUBENTITY extends DataObject<SUBENTITY>>(object: ENTITY,
+    public static getAllowedValuesFilter<ENTITY extends DataObject<ENTITY>, SUBENTITY extends DataObject<SUBENTITY>>(entityClass: ConstructorOf<ENTITY>,
                                                                                                                      field: keyof ENTITY,
-                                                                                                                     context: RequestContext<AbstractUser>): Promise<DataResponse<SUBENTITY[]>> {
-        const fieldModel: EntityField = ModelService.getFields(object.$entity)[field as string];
+                                                                                                                     context: RequestContext<AbstractUser>): AbstractFilter {
+        const fieldModel: EntityField = ModelService.getFields(entityClass.name)[field as string];
         if (fieldModel.isSimpleField || fieldModel instanceof CompositionField) {
             throw new UnsupportedOperationError("Cannot get allowed values for simple or composition fields");
         }
-        const allowedValuesMap: Dictionary<Function, keyof ENTITY> = object.$allowedValues;
+        const object: ENTITY = new entityClass();
+        const allowedValuesMap: Dictionary<Function, keyof ENTITY> = object.$allowedValues ?? {};
         const allowedValuesFn: Function = allowedValuesMap[field];
-        let data: DataObject<any>[];
+
         if (allowedValuesFn) {
-            data = await allowedValuesFn.apply(object, [context]);
+            return allowedValuesFn.apply(object, [context]) as AbstractFilter;
         } else {
-            data = await DataService.findAllRaw((fieldModel as ReferenceField).classGetter());
+            return Filter.true();
         }
-        const fieldDataEntity: string = (fieldModel as ReferenceField).classGetter().name;
-        const displayPatternFields: string[] = this.getDisplayPatternFields(fieldDataEntity).map((f: EntityField) => f.name);
-        return {
-            data,
-            model: this.getModel(fieldDataEntity, displayPatternFields),
-        };
     }
 
     public async init(app: Enemene) {
@@ -137,6 +113,7 @@ export class ModelService {
 
                     if (entityField.type === EntityFieldType.PASSWORD) {
                         options.set = function (this: Model, value: string) {
+                            console.log(propertyKey, value, genSaltSync());
                             this.setDataValue(propertyKey as keyof Model, bcrypt.hashSync(value, genSaltSync()) as any);
                         };
                     }
@@ -185,18 +162,28 @@ export class ModelService {
                                 model: entityField.classGetter().name,
                             }
                         });
-                    } else if (entityField instanceof CollectionField) {
-                        if (entityField.composition) {
+                    }
+                });
+        });
+
+        Object.entries(ModelService.MODEL).forEach(([modelName, fields]) => {
+            Object.entries(fields)
+                .filter(([_, entityField]) => !entityField.isSimpleField)
+                .forEach(([propertyKey, entityField]) => {
+                    if (entityField instanceof CollectionField) {
+                        if (entityField.mappedBy) {
+                            const mappedField: EntityField = ModelService.MODEL[entityField.classGetter().name][entityField.mappedBy];
+                            (ModelService.MODEL[modelName][propertyKey] as CollectionField).composition = mappedField.required;
                             app.log.debug(this.constructor.name, `Registering hasMany (${chalk.bold(modelName + "." + propertyKey)} => ${chalk.bold(entityField.classGetter().name)}).`);
                             db.model(modelName).hasMany(db.model(entityField.classGetter().name), {
                                 as: propertyKey,
                                 foreignKey: {
                                     field: entityField.foreignKey,
                                     name: entityField.foreignKey,
-                                    allowNull: false,
+                                    allowNull: !mappedField.required,
                                 },
-                                onUpdate: "CASCADE",
-                                onDelete: "CASCADE",
+                                onUpdate: entityField.required ? "RESTRICT" : "SET NULL",
+                                onDelete: entityField.required ? "RESTRICT" : "SET NULL",
                                 constraints: true,
                                 foreignKeyConstraint: true
                             });

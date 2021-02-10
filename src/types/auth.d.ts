@@ -1,6 +1,7 @@
 import {uuid} from "./base";
-import {RequestMethod} from "./controller";
+import {RequestContext, RequestMethod} from "./controller";
 import {DataObject} from "./model";
+import {PathDefinition} from "../modules/core/auth/interface/path-definition.interface";
 
 /**
  * Extend this abstract class to define the User model uses as authentication for users.
@@ -120,4 +121,12 @@ export declare enum Permission {
     CREATE = "c",
     UPDATE = "u",
     DELETE = "d",
+}
+
+export declare class PermissionService {
+    public checkRoutePermission(fullPath: string, pathDefinition: PathDefinition, user?: AbstractUser): void;
+
+    public checkActionPermission(viewName: string, actionName: string, context: RequestContext<AbstractUser>): void;
+
+    public checkViewPermission(viewName: string, method: RequestMethod, context: RequestContext<AbstractUser>): void;
 }

@@ -13,10 +13,10 @@ export class Role extends DataObject<Role> implements AfterCreateHook {
     @Field("Name", EntityFieldType.STRING, true)
     name: string;
 
-    @Collection("Routen-Berechtigungen", () => RoutePermission, "roleId", true)
+    @Collection("Routen-Berechtigungen", () => RoutePermission, "roleId", "role")
     routePermissions: RoutePermission[];
 
-    @Collection("View-Berechtigungen", () => ViewPermission, "roleId", true)
+    @Collection("View-Berechtigungen", () => ViewPermission, "roleId", "role")
     viewPermissions: ViewPermission[];
 
 

@@ -1,12 +1,11 @@
 import {ValidationError} from "../interface/validation-error.interface";
 
-export interface ValidationFieldError extends ValidationError {
+export class ValidationFieldError extends ValidationError {
 
-    type: "field";
+    public i18nLabel: string;
 
-    field: string;
-
-    message: string,
-
-    label: string;
+    constructor(public field: string,
+                public message: string) {
+        super();
+    }
 }

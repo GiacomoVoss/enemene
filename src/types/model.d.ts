@@ -1,6 +1,5 @@
-import {Model} from "sequelize-typescript";
+import {BuildOptions, FindOptions, Model, ModelAttributeColumnOptions, Order} from "sequelize";
 import {ConstructorOf, Dictionary, serializable} from "./base";
-import {BuildOptions, FindOptions, ModelAttributeColumnOptions, Order} from "sequelize";
 import {AbstractFilter} from "./filter";
 import {RequestContext} from "./controller";
 import {AbstractUser} from "./auth";
@@ -28,7 +27,7 @@ export declare function Calculated(label: string | string[],
 export declare function Collection(label: string | string[],
                                    classGetter: () => ConstructorOf<DataObject<any>>,
                                    foreignKey: string,
-                                   composition?: boolean): Function;
+                                   mappedBy?: string): Function;
 
 export function Composition(label: string | string[],
                             classGetter: () => ConstructorOf<DataObject<any>>,

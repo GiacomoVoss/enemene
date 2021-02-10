@@ -3,7 +3,6 @@ import proxy from "express-http-proxy";
 import {RouterService} from "../router/service/router.service";
 import express, {NextFunction, Request, Response} from "express";
 import path from "path";
-import {ViewService} from "../view";
 import {EnemeneConfig} from "./interface/enemene-config.interface";
 import {Sequelize} from "sequelize";
 import {DbImport} from "./bin/db-import";
@@ -17,6 +16,8 @@ import * as fs from "fs";
 import {ConstructorOf} from "../../../base/constructor-of";
 import {FileService} from "../file/service/file.service";
 import {ModelService} from "../model/service/model.service";
+import {ViewInitializerService} from "../view";
+import {UnrestrictedRequestContext} from "../router";
 import bodyParser = require("body-parser");
 
 require("express-async-errors");
@@ -39,11 +40,12 @@ export class Enemene {
         this.express = express();
         this.devMode = process.env.NODE_ENV === "development";
         this.express.use(allowHeaders);
-        this.express.use(bodyParser.urlencoded({limit: "50mb"}));
+        this.express.use(bodyParser.urlencoded({limit: "50mb", extended: true}));
         this.express.use(bodyParser.json({limit: "50mb"}));
         this.log = Enemene.log;
         this.log[config.logLevel.toLowerCase()]("Server", "Log level: " + config.logLevel.toUpperCase());
         this.config.port = `${this.normalizePort(config.port)}`;
+        UnrestrictedRequestContext.$userModel = config.userModel;
 
         this.db = new Sequelize({
             host: config.db.host,
@@ -138,7 +140,7 @@ export class Enemene {
     }
 
     private async setupViews(): Promise<void> {
-        await this.inject(ViewService).init();
+        return Enemene.app.inject(ViewInitializerService).init();
     }
 
     private async setupActions(): Promise<void> {
@@ -146,6 +148,7 @@ export class Enemene {
     }
 
     private async setupServices(): Promise<void> {
+        FileService.DATA_PATH = this.config.dataPath;
         const serviceFiles: string[] = this.inject(FileService).scanForFilePattern(Enemene.app.config.modulesPath, /.*\.service\.js/);
         const serviceModules: Dictionary<ConstructorOf<Function>>[] = await Promise.all(serviceFiles.map((filePath: string) => import(filePath)));
         serviceModules.forEach((moduleMap: Dictionary<ConstructorOf<Function>>) => {

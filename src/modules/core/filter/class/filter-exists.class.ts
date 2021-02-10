@@ -8,6 +8,8 @@ import {Dictionary} from "../../../../base/type/dictionary.type";
 import {serializable} from "../../../../base/type/serializable.type";
 import {get} from "lodash";
 import {AbstractFilter} from "./abstract-filter.class";
+import {Op} from "sequelize";
+import {ReferenceField} from "../../model/interface/reference-field.class";
 
 export class FilterExists extends AbstractFilter {
     constructor(private field: string,
@@ -16,17 +18,32 @@ export class FilterExists extends AbstractFilter {
     }
 
     public toSequelize(entity, includes: IncludeOptions[], prefix?: string): WhereOptions {
-        const entityField: CompositionField = ModelService.getFields(entity.name)[this.field];
+        const entityField: CompositionField | ReferenceField = ModelService.getFields(entity.name)[this.field];
         if (!entityField) {
             throw new UnsupportedOperationError(`Unknown field ${chalk.bold(this.field)} in entity ${chalk.bold(entity.name)}.`);
         }
+        if (!entityField.classGetter) {
+            return {
+                [entityField.name]: {
+                    [Op.ne]: null,
+                }
+            };
+        }
+
         includes.push({
             model: Enemene.app.db.model(entityField.classGetter().name),
             as: this.field,
             required: false,
         });
+
         if (this.arg) {
             return this.arg.toSequelize(entityField.classGetter(), includes, this.field);
+        } else {
+            return {
+                [entityField.foreignKey]: {
+                    [Op.ne]: null,
+                }
+            };
         }
     }
 

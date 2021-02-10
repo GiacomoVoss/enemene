@@ -16,7 +16,7 @@ export default class AuthController extends AbstractController {
             throw new UnauthorizedError();
         }
 
-        const user: AbstractUser = await Enemene.app.config.userModel.findOne({
+        const user: AbstractUser = await Enemene.app.config.userModel.findOne<AbstractUser>({
             where: {
                 username: username,
                 active: true,

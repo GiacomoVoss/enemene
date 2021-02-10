@@ -2,7 +2,7 @@ import {AbstractUser} from "./auth";
 import {ConstructorOf, uuid} from "./base";
 import {LogLevel, LogService} from "./log";
 import {RequestContext} from "./controller";
-import {Sequelize} from "sequelize-typescript";
+import {Sequelize} from "sequelize";
 
 /**
  * Enemene's main class.

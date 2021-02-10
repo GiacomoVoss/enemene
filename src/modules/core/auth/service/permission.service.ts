@@ -1,23 +1,38 @@
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {uuid} from "../../../../base/type/uuid.type";
-import {AbstractUser, RoutePermission, ViewPermission} from "..";
+import {AbstractUser, ForbiddenError, RoutePermission, ViewPermission} from "..";
 import {RouterService} from "../../router/service/router.service";
 import {PathDefinition} from "../interface/path-definition.interface";
 import {UnauthorizedError} from "../error/unauthorized.error";
 import {RequestMethod} from "../../router/enum/request-method.enum";
 import {Permission} from "../enum/permission.enum";
-import {ViewService} from "../../view/service/view.service";
-import {Enemene} from "../../../..";
+import {ViewInitializerService} from "../../view/service/view-initializer.service";
+import {Enemene, UnrestrictedRequestContext, View, ViewFieldDefinition} from "../../../..";
 import {ObjectNotFoundError} from "../../error/object-not-found.error";
-import chalk from "chalk";
 import {RequestContext} from "../../router/interface/request-context.interface";
 import {ViewDefinition} from "../../view/class/view-definition.class";
+import {serializable} from "../../../../base/type/serializable.type";
+import {keyBy, uniq} from "lodash";
+import {ConstructorOf} from "../../../../base/constructor-of";
 
 export class PermissionService {
 
     private permissionCache: Dictionary<{ route: Dictionary<RoutePermission[]>, view: Dictionary<ViewPermission> }, uuid> = {};
 
-    private viewService: ViewService = Enemene.app.inject(ViewService);
+    private viewService: ViewInitializerService = Enemene.app.inject(ViewInitializerService);
+
+    public static addViewPermissions(model: Dictionary<serializable>, viewDefinition: ViewDefinition<any>): Dictionary<serializable> {
+        return keyBy(Object.values(model).map((field: Dictionary<serializable>) => {
+            const viewField: ViewFieldDefinition<any, any> | undefined = viewDefinition.fields.find(f => f.name === field.name);
+            if (viewField) {
+                field.canCreate = viewField.canCreate;
+                field.canUpdate = viewField.canUpdate;
+                field.canRemove = viewField.canRemove;
+                field.canInsert = viewField.canInsert;
+            }
+            return field;
+        }), "name");
+    }
 
     public async buildCache(): Promise<void> {
         const routePermissions: RoutePermission[] = await RoutePermission.findAll();
@@ -45,37 +60,79 @@ export class PermissionService {
         }
     }
 
-    public checkActionPermission(viewName: string, actionName: string, context: RequestContext<AbstractUser>): void {
-        let viewPermission: ViewPermission;
-        if (!context.currentUser) {
-            viewPermission = this.permissionCache["PUBLIC"]?.view[viewName];
-        } else {
-            viewPermission = this.permissionCache[context.currentUser.roleId]?.view[viewName];
+    public checkActionPermission(view: ViewDefinition<any>, actionName: string, context: RequestContext<AbstractUser>): void {
+        const viewActionExists: boolean = !!view.actions.find(a => a.name === actionName);
+
+        if (viewActionExists) {
+            throw new ObjectNotFoundError(actionName);
         }
-        if (context.currentUser && Enemene.app.config.developerRoleId && context.currentUser.roleId === Enemene.app.config.developerRoleId) {
+
+        if (context instanceof UnrestrictedRequestContext) {
             return;
         }
-        if (!viewPermission) {
-            throw new ObjectNotFoundError();
+
+        let viewPermission: ViewPermission;
+        if (!context.currentUser) {
+            viewPermission = this.permissionCache["PUBLIC"]?.view[view.viewClass.name];
+        } else {
+            viewPermission = this.permissionCache[context.currentUser.roleId]?.view[view.viewClass.name];
         }
-        if (!viewPermission.actions.includes(actionName)) {
+        if (!viewPermission) {
+            throw new ForbiddenError();
+        }
+        if (!view.actions.find(a => a.name === actionName) || !viewPermission.actions.includes(actionName)) {
             throw new ObjectNotFoundError();
         }
     }
 
-    public checkViewPermission(viewName: string, method: RequestMethod, context: RequestContext<AbstractUser>): void {
-        let viewPermission: ViewPermission;
-        if (!context.currentUser) {
-            viewPermission = this.permissionCache["PUBLIC"]?.view[viewName];
-        } else {
-            viewPermission = this.permissionCache[context.currentUser.roleId]?.view[viewName] ?? this.permissionCache["PUBLIC"]?.view[viewName];
+    public checkViewPermission(view: ConstructorOf<View<any>>, method: RequestMethod, context: RequestContext<AbstractUser>): void {
+        let viewRequestAllowed: boolean = false;
+        switch (method) {
+            case RequestMethod.GET:
+                viewRequestAllowed = true;
+                break;
+            case RequestMethod.PUT:
+                viewRequestAllowed = view.prototype.$view.updatable;
+                break;
+            case RequestMethod.POST:
+                viewRequestAllowed = view.prototype.$view.creatable;
+                break;
+            case RequestMethod.DELETE:
+                viewRequestAllowed = view.prototype.$view.deletable;
+                break;
         }
-        if (context.currentUser && Enemene.app.config.developerRoleId && context.currentUser.roleId === Enemene.app.config.developerRoleId) {
+        if (!viewRequestAllowed) {
+            throw new ForbiddenError();
+        }
+
+        if (context instanceof UnrestrictedRequestContext) {
             return;
         }
-        if (!viewPermission) {
-            throw new ObjectNotFoundError();
+
+        let viewPermission: ViewPermission;
+        if (!context.currentUser) {
+            viewPermission = this.permissionCache["PUBLIC"]?.view[view.name];
+        } else if (Enemene.app.config.developerRoleId && context.currentUser.roleId === Enemene.app.config.developerRoleId) {
+            const permissions = [];
+            for (const role of Object.values(this.permissionCache)) {
+                const permission: ViewPermission | undefined = role.view[view.name];
+                if (permission) {
+                    permissions.push(...permission.getPermissions());
+                }
+            }
+            if (permissions.length) {
+                viewPermission = new ViewPermission({
+                    view: view.name,
+                    permissions: uniq(permissions).join(""),
+                });
+            }
+        } else {
+            viewPermission = this.permissionCache[context.currentUser.roleId]?.view[view.name] ?? this.permissionCache["PUBLIC"]?.view[view.name];
         }
+        if (!viewPermission) {
+            throw new ObjectNotFoundError("ViewPermission");
+        }
+
         let permitted: boolean = false;
         switch (method) {
             case RequestMethod.GET:
@@ -118,10 +175,6 @@ export class PermissionService {
             this.permissionCache[routePermission.roleId].route[routePermission.route].push(routePermission);
         } else if ((permission as ViewPermission).view) {
             const viewPermission = permission as ViewPermission;
-            const viewDefinition: ViewDefinition<any> = this.viewService.getViewDefinition(viewPermission.view);
-            if (!viewDefinition) {
-                Enemene.log.warn(this.constructor.name, `Permission ${chalk.bold(viewPermission.id)} applies to non-existing view ${chalk.bold(viewPermission.view)}.`);
-            }
             this.permissionCache[viewPermission.roleId].view[viewPermission.view] = viewPermission;
         }
     }

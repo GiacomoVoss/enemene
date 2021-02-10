@@ -3,6 +3,8 @@ import * as path from "path";
 
 export class FileService {
 
+    public static DATA_PATH: string;
+
     /**
      * Copies a file from one destination path to the other.
      * @param from      Source path.
@@ -25,15 +27,6 @@ export class FileService {
      */
     public deleteFile(filePath): void {
         fs.unlinkSync(filePath);
-    }
-
-    /**
-     * Checks if a given file exists.
-     * @param filePath
-     * @return boolean if the file exists.
-     */
-    public fileExists(filePath: string): boolean {
-        return fs.existsSync(filePath);
     }
 
     /**

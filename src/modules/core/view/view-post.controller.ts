@@ -1,6 +1,5 @@
 import {Body, Context, Path, Post, Req} from "../router";
 import {DataObject} from "../model";
-import {RequestMethod} from "../router/enum/request-method.enum";
 import {AbstractUser, DataResponse, SecureRequest, UuidService, View, ViewFieldDefinition} from "../../..";
 import {Dictionary} from "../../../base/type/dictionary.type";
 import {serializable} from "../../../base/type/serializable.type";
@@ -18,10 +17,10 @@ export default class ViewPostController extends AbstractViewController {
     @Post("/:view", true)
     async createObject<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
                                                           @Body() data: Dictionary<serializable>,
-                                                          @Context() context: Dictionary<serializable>): Promise<DataResponse<ENTITY>> {
-        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.POST, context);
+                                                          @Context() context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
+        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
         const view = new viewDefinition.viewClass();
-        view.setValues(data);
+        view.setValues(data, context);
 
         return {
             data: await this.viewService.save(view, context),
@@ -43,8 +42,8 @@ export default class ViewPostController extends AbstractViewController {
         const attributeTokens: string[] = attributePath.split("/");
         const collectionAttribute: string = attributeTokens.pop();
 
-        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.POST, context);
-        let object: View<ENTITY> = await this.viewService.findById(viewDefinition, objectId, context);
+        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
+        let object: View<ENTITY> = await this.viewService.findById(viewDefinition.viewClass, objectId, context);
         for (const token of attributeTokens) {
             if (Array.isArray(object)) {
                 if (UuidService.isUuid(token)) {
@@ -70,24 +69,21 @@ export default class ViewPostController extends AbstractViewController {
             throw new InvalidAttributePathError(attributePath);
         }
 
-        const newObjectId: uuid = UuidService.getUuid();
         const newSubView: View<any> = new collectionViewField.subView();
         newSubView.setValues({
             ...data,
-            id: newObjectId,
-        });
+        }, context);
         object.setValues({
             ...object,
             [collectionAttribute]: [
                 ...(object[collectionAttribute] ?? []),
-                newSubView.toJSON(),
+                newSubView,
             ],
-        });
-        console.log(object);
+        }, context);
 
         const rootObject = await this.viewService.save(object, context);
         return {
-            data: rootObject.getByPath(`${attributePath}/${newObjectId}`),
+            data: rootObject.getByPath(`${attributePath}/${newSubView.id}`),
             model: viewDefinition.getModel(),
         };
     }

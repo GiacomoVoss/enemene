@@ -6,7 +6,6 @@ import {Dictionary} from "../../../base/type/dictionary.type";
 import {uuid} from "../../../base/type/uuid.type";
 import {serializable} from "../../../base/type/serializable.type";
 import {AbstractViewController} from "./abstract-view-controller";
-import {RequestMethod} from "../router/enum/request-method.enum";
 import {RequestContext} from "../router/interface/request-context.interface";
 import {Controller} from "../router/decorator/controller.decorator";
 import {ViewDefinition} from "./class/view-definition.class";
@@ -19,9 +18,9 @@ export default class ViewPutController extends AbstractViewController {
                                                           @Path("id") objectId: uuid,
                                                           @Body() data: Dictionary<serializable>,
                                                           @Context() context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
-        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.PUT, context);
-        const view: View<ENTITY> = await this.viewService.findById(viewDefinition, objectId, context);
-        view.setValues(data);
+        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
+        const view: View<ENTITY> = await this.viewService.findById(viewDefinition.viewClass, objectId, context);
+        view.setValues(data, context);
 
         return {
             data: await this.viewService.save(view, context),
@@ -41,26 +40,26 @@ export default class ViewPutController extends AbstractViewController {
             return this.updateObject(viewName, objectId, data, context);
         }
 
-        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.PUT, context);
-        const rootObject: View<ENTITY> = await this.viewService.findById(viewDefinition, objectId, context);
+        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
+        const rootObject: View<ENTITY> = await this.viewService.findById(viewDefinition.viewClass, objectId, context);
 
         let object = rootObject.getByPath(attributePath);
 
         if (object instanceof View) {
-            object.setValues(data);
+            object.setValues(data, context);
         } else {
             const subAttributePath: string[] = attributePath.split("/");
             const lastToken: string = subAttributePath.pop();
             object = rootObject.getByPath(subAttributePath.join("/"));
             object.setValues({
                 [lastToken]: data,
-            });
+            }, context);
         }
 
         await this.viewService.save(object, context);
 
         return {
-            data: (await this.viewService.findById(viewDefinition, objectId, context)).getByPath(attributePath),
+            data: (await this.viewService.findById(viewDefinition.viewClass, objectId, context)).getByPath(attributePath),
             model: viewDefinition.getModel(),
         };
     }

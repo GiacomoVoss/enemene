@@ -1,99 +1,53 @@
 import {DataObject} from "../../model/data-object.model";
-import {Validate} from "../class/validate.class";
 import {ValidationResult} from "../type/validation-result.type";
-import {ValidationError} from "../interface/validation-error.interface";
-import {get} from "lodash";
 import {InputValidationError} from "../error/input-validation.error";
 import {ModelService} from "../../model/service/model.service";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {EntityField} from "../../model/interface/entity-field.class";
+import {AbstractValidate} from "../class/abstract-validate.class";
+import {serializable} from "../../../../base/type/serializable.type";
+import {ValidationError} from "../interface/validation-error.interface";
 import {ValidationFieldError} from "../interface/validation-field-error.interface";
-import {ValidationNotError} from "../interface/validation-not-error.interface";
-import {ValidationOrError} from "../interface/validation-or-error.interface";
 import {I18nService} from "../../i18n/service/i18n.service";
+import {ValidationNotError} from "../class/validate-not.class";
+import {ValidationOrError} from "../class/validate-or.class";
+import {View} from "../../view";
+import {RequestContext} from "../../router/interface/request-context.interface";
+import {AbstractUser} from "../../auth";
 
 export class ValidationService {
 
-    public static validate<ENTITY extends DataObject<ENTITY>>(object: DataObject<ENTITY>, validation?: Validate, language?: string): void {
-        const fields: Dictionary<EntityField, keyof ENTITY> = ModelService.getFields(object.$entity);
-        const requiredFields: string[] = Object.values(fields)
-            .filter((field: EntityField) => field.required)
-            .map((field: EntityField) => field.name);
+    public validateView<ENTITY extends DataObject<ENTITY>>(view: View<ENTITY>, context: RequestContext<AbstractUser>): void {
+        this.validate(view.toJSON(), view.$view.entity.name, context.language, view.$view.validation);
+    }
 
-        const compositeValidations: Validate[] = [];
+    public validate<ENTITY extends DataObject<ENTITY>>(object: Dictionary<serializable>, entity: string, language: string, validation?: AbstractValidate): void {
+        let result: ValidationResult;
 
         if (validation) {
-            compositeValidations.push(validation);
-        }
-
-        if (requiredFields.length) {
-            compositeValidations.push(...requiredFields.map(Validate.exists));
-        }
-
-        let result;
-
-        if (compositeValidations.length) {
-            result = this.validateInternal(object, Validate.and(...compositeValidations), language);
+            result = validation.evaluate(object);
         } else {
             result = true;
         }
 
         if (result !== true) {
-            throw new InputValidationError(result);
+            throw new InputValidationError(this.addI18nLabels(result, ModelService.getFields(entity), language), entity, language);
         }
     }
 
-    private static validateInternal<ENTITY extends DataObject<ENTITY>>(object: DataObject<ENTITY>, validation: Validate, language?: string): ValidationResult {
-        const model: Dictionary<EntityField> = ModelService.getFields(object.$entity);
-        const errors: ValidationError[] = [];
-        if (validation.name === "and") {
-            (validation.args.map((arg: Validate) => this.validateInternal(object, arg, language))
-                .filter((result: ValidationResult) => result !== true) as ValidationError[])
-                .forEach((errorResults: ValidationError[]) => {
-                    errors.push(...errorResults);
-                });
-        } else if (validation.name === "or") {
-            const orResults: ValidationResult[] = [];
-            let fulfilled = false;
-            for (const arg of validation.args) {
-                const result: ValidationResult = this.validateInternal(object, arg, language);
-                if (result === true) {
-                    fulfilled = true;
-                    break;
-                } else {
-                    orResults.push(result);
-                }
-            }
-            if (!fulfilled) {
-                errors.push({
-                    type: "or",
-                    validationErrors: orResults,
-                } as ValidationOrError);
-            }
-        } else if (validation.name === "not") {
-            const result: ValidationResult = this.validateInternal(object, validation.args[0], language);
-            if (result === true) {
-                errors.push({
-                    type: "not",
-                    validationError: result,
-                } as ValidationNotError);
-            }
-        } else if (validation.name === "exists") {
-            const value = get(object, validation.parameters[0]);
-            if (value === undefined || value === null || (typeof value === "string" && value.length === 0)) {
-                errors.push({
-                    type: "field",
-                    field: validation.parameters[0],
-                    message: "required",
-                    label: I18nService.getI18nizedString(model[validation.parameters[0]].label, language),
-                } as ValidationFieldError);
-            }
-        }
+    private addI18nLabels<ENTITY extends DataObject<ENTITY>>(errors: ValidationError[], model: Dictionary<EntityField, keyof ENTITY>, language: string): ValidationError[] {
+        return errors.map(error => this.addI18nLabel(error, model, language));
+    }
 
-        if (!errors.length) {
-            return true;
-        } else {
-            return errors;
+    private addI18nLabel<ENTITY extends DataObject<ENTITY>>(error: ValidationError, model: Dictionary<EntityField, keyof ENTITY>, language: string): ValidationError {
+        if (error instanceof ValidationFieldError) {
+            const field: EntityField = model[error.field];
+            error.i18nLabel = I18nService.getI18nizedString(field.label, language);
+        } else if (error instanceof ValidationNotError) {
+            error.validationError = this.addI18nLabel(error.validationError, model, language);
+        } else if (error instanceof ValidationOrError) {
+            error.validationErrors = error.validationErrors.map(orError => this.addI18nLabel(orError, model, language));
         }
+        return error;
     }
 }

@@ -4,7 +4,7 @@ import {Dictionary} from "../../../base/type/dictionary.type";
 /**
  * Basic abstract entity model.
  */
-export class DataObject<E> extends Model<DataObject<E>> {
+export class DataObject<E> extends Model {
 
     $entity: string;
     $displayPattern: string = "{id}";

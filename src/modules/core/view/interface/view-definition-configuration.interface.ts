@@ -15,5 +15,9 @@ export class ViewDefinitionConfiguration<ENTITY extends DataObject<ENTITY>> {
 
     searchAttributes?: string[];
 
+    creatable?: boolean;
+    updatable?: boolean;
+    deletable?: boolean;
+
     meta?: any;
 }

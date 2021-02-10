@@ -6,5 +6,6 @@ import {ActionParameterType} from "../enum/action-parameter-type.enum";
 export function ActionOrigin(): Function {
     return function (target: ConstructorOf<AbstractAction>, propertyKey: string, parameterIndex: number): void {
         RegisterParameter(ActionParameterType.ORIGIN)(target, propertyKey, parameterIndex);
+        target.constructor.prototype.$hasOrigin = true;
     };
 }

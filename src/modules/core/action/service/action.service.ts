@@ -1,7 +1,7 @@
 import {ObjectNotFoundError} from "../../error/object-not-found.error";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import chalk from "chalk";
-import {AbstractUser, ActionStepResult, ActionStepResultForm, ActionStepResultSelection, DataObject, Enemene, View, ViewService} from "../../../..";
+import {AbstractUser, ActionStepResult, ActionStepResultForm, ActionStepResultSelection, DataObject, Enemene, Filter, View} from "../../../..";
 import {AbstractAction} from "../class/abstract-action.class";
 import {ConstructorOf} from "../../../../base/constructor-of";
 import {serializable} from "../../../../base/type/serializable.type";
@@ -9,17 +9,22 @@ import {ActionParameterConfiguration} from "../interface/action-parameter-config
 import {InputValidationError} from "../../validation/error/input-validation.error";
 import {ActionParameterType} from "../enum/action-parameter-type.enum";
 import {uuid} from "../../../../base/type/uuid.type";
-import {MalformedActionInput} from "../error/malformed-action-input.error";
 import {RequestContext} from "../../router/interface/request-context.interface";
 import {ActionOriginInput} from "../interface/action-origin-input.interface";
 import {FileService} from "../../file/service/file.service";
+import {ActionInputValidationError} from "../class/action-input-validation-error.class";
+import {ParameterType} from "../../router/enum/parameter-type.enum";
+import {UnsupportedOperationError} from "../../error/unsupported-operation.error";
+import {ViewFindService} from "../../view/service/view-find.service";
+import {ViewHelperService} from "../../view/service/view-helper.service";
 
 /**
  * Service for handling views for data manipulation.
  */
 export class ActionService {
 
-    private viewService: ViewService = Enemene.app.inject(ViewService);
+    private viewHelperService: ViewHelperService = Enemene.app.inject(ViewHelperService);
+    private viewFindService: ViewFindService = Enemene.app.inject(ViewFindService);
     private fileService: FileService = Enemene.app.inject(FileService);
     private ACTIONS: Dictionary<ConstructorOf<AbstractAction>> = {};
 
@@ -73,40 +78,23 @@ export class ActionService {
         return new actionClass();
     }
 
-    public async validateActionInput<ENTITY extends DataObject<ENTITY>>(step: ActionParameterConfiguration, stepResult: ActionStepResult, input: serializable, context: RequestContext<AbstractUser>): Promise<any> {
+    public async validateActionInput<ENTITY extends DataObject<ENTITY>>(step: ActionParameterConfiguration, stepResult: ActionStepResult, input: serializable, context: RequestContext<AbstractUser>, actionName: string): Promise<any> {
         if (stepResult instanceof ActionStepResultForm) {
             if (input === undefined) {
-                throw new InputValidationError([{
-                    type: "actionInput",
-                    field: step.label,
-                    message: "required",
-                }]);
+                throw new InputValidationError([new ActionInputValidationError(step.label)], actionName, context.language);
             }
-            return this.viewService.wrap(input as DataObject<ENTITY>, stepResult.view.prototype.$view);
+            return this.viewHelperService.wrap(input as DataObject<ENTITY>, stepResult.view.prototype.$view);
         } else if (stepResult instanceof ActionStepResultSelection) {
             if (!Array.isArray(input)) {
-                throw new MalformedActionInput([{
-                    type: "actionInput",
-                    field: step.label,
-                    message: "malformed",
-                }]);
+                throw new InputValidationError([new ActionInputValidationError(step.label)], actionName, context.language);
             }
             const selectedIds: uuid[] = input as uuid[];
-            const objects: View<any>[] = (await this.viewService.findAll(stepResult.view.prototype.$view, context))
-                .filter((object: View<ENTITY>) => selectedIds.includes(object.id));
+            const objects: View<any>[] = await this.viewFindService.findAll(stepResult.view, context, Filter.in("id", selectedIds));
             if (stepResult.singleSelection && objects.length > 1) {
-                throw new MalformedActionInput([{
-                    type: "actionInput",
-                    field: step.label,
-                    message: "malformed",
-                }]);
+                throw new InputValidationError([new ActionInputValidationError(step.label)], actionName, context.language);
             }
             if (stepResult.required && objects.length === 0) {
-                throw new MalformedActionInput([{
-                    type: "actionInput",
-                    field: step.label,
-                    message: "required",
-                }]);
+                throw new InputValidationError([new ActionInputValidationError(step.label)], actionName, context.language);
             }
             return objects;
         } else {
@@ -114,18 +102,29 @@ export class ActionService {
         }
     }
 
-    public async resolveParameter(step: ActionParameterConfiguration, param: [ActionParameterType, number?], origin: ActionOriginInput, validatedInputs: any[]): Promise<any> {
+    public validateActionOrigin(origin?: Partial<ActionOriginInput>): void {
+        if (!origin) {
+            throw new UnsupportedOperationError("Origin not present.");
+        }
+        if (!origin.view) {
+            throw new UnsupportedOperationError("Origin view not present.");
+        }
+        if (!origin.objectIds.length) {
+            throw new UnsupportedOperationError("Origin object id(s) not present.");
+        }
+    }
+
+    public async resolveParameter(step: ActionParameterConfiguration, param: [ActionParameterType | ParameterType, number?], origin: ActionOriginInput, validatedInputs: any[], context: RequestContext<AbstractUser>): Promise<any> {
         const [paramType, value] = param;
-        let parameterValue: any = undefined;
         switch (paramType) {
             case ActionParameterType.ORIGIN:
-                parameterValue = origin;
-                break;
+                return origin;
             case ActionParameterType.INPUT:
-                parameterValue = validatedInputs[value];
-                break;
+                return validatedInputs[value];
+            case ActionParameterType.CONTEXT:
+                return context;
         }
 
-        return parameterValue;
+        return undefined;
     }
 }

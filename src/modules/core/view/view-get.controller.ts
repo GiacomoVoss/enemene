@@ -2,8 +2,7 @@ import {Context, Get, Path, Query, Req} from "../router";
 import {AbstractUser, SecureRequest} from "../auth";
 import {DataResponse, DataService} from "../data";
 import {DataObject} from "../model";
-import {RequestMethod} from "../router/enum/request-method.enum";
-import {ViewFieldDefinition} from "./";
+import {ViewFieldDefinition, ViewInitializerService} from "./";
 import {Dictionary} from "../../../base/type/dictionary.type";
 import {serializable} from "../../../base/type/serializable.type";
 import {ObjectNotFoundError} from "../error/object-not-found.error";
@@ -18,6 +17,7 @@ import {Controller} from "../router/decorator/controller.decorator";
 import {ViewDefinition} from "./class/view-definition.class";
 import {get, set} from "lodash";
 import {InvalidAttributePathError} from "./error/invalid-attribute-path.error";
+import {AbstractFilter, FilterService} from "../filter";
 
 
 @Controller("view")
@@ -122,11 +122,11 @@ export default class ViewGetController extends AbstractViewController {
                                                         @Query("order") order: string,
                                                         @Query("limit") limit: string,
                                                         @Query("offset") offset: string,
-                                                        @Query("search") search: string,
+                                                        @Query("search") searchString: string,
                                                         @Context() context: RequestContext<AbstractUser>,
                                                         @Header(HttpHeader.LANGUAGE) language: string): Promise<DataResponse<ENTITY[]>> {
-        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.GET, context);
-        const data: View<ENTITY>[] = await this.viewService.findAll(viewDefinition, context, DataService.getFindOptions(order, limit, offset), search);
+        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
+        const data: View<ENTITY>[] = await this.viewService.findAll(viewDefinition.viewClass, context, undefined, this.viewHelperService.parseFindOptions(order, limit, offset, searchString));
         return {
             data: data.map((object: View<ENTITY>) => this.filterFields(object, requestedFields)),
             model: viewDefinition.getModel(language),
@@ -139,9 +139,9 @@ export default class ViewGetController extends AbstractViewController {
                                                        @Path("id") objectId: string,
                                                        @Query("fields") requestedFields: string,
                                                        @Context() context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
-        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.GET, context);
+        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
         return {
-            data: this.filterFields(await this.viewService.findById(viewDefinition, objectId, context), requestedFields) as Dictionary<any, keyof ENTITY>,
+            data: this.filterFields(await this.viewService.findById(viewDefinition.viewClass, objectId, context), requestedFields) as Dictionary<any, keyof ENTITY>,
             model: viewDefinition.getModel(),
             actions: viewDefinition.getActionConfigurations(),
         };
@@ -152,15 +152,15 @@ export default class ViewGetController extends AbstractViewController {
                                                        @Path("id") objectId: string,
                                                        @Req request: SecureRequest,
                                                        @Query("fields") requestedFields: string,
-                                                       @Context() context: Dictionary<serializable>): Promise<DataResponse<any>> {
+                                                       @Context() context: RequestContext<AbstractUser>): Promise<DataResponse<any>> {
         const attributePath = request.params[0];
         if (!attributePath || !attributePath.length) {
             return this.getObject(viewName, objectId, requestedFields, context);
         }
 
-        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.GET, context);
+        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
 
-        const view: View<ENTITY> = await this.viewService.findById(viewDefinition, objectId, context);
+        const view: View<ENTITY> = await this.viewService.findById(viewDefinition.viewClass, objectId, context);
 
         return {
             data: view.getByPath(attributePath),
@@ -171,7 +171,7 @@ export default class ViewGetController extends AbstractViewController {
     @Get("/model/:view", true)
     async getViewModel(@Context() context: RequestContext<AbstractUser>,
                        @Path("view") viewName: string): Promise<Dictionary<serializable>> {
-        const viewDefinition: ViewDefinition<any> = this.getViewDefinition(viewName, RequestMethod.GET, context);
+        const viewDefinition: ViewDefinition<any> = this.getViewDefinition(viewName);
         return viewDefinition.getModel();
     }
 
@@ -179,8 +179,8 @@ export default class ViewGetController extends AbstractViewController {
     async getViewModelByPath(@Context() context: RequestContext<AbstractUser>,
                              @Req request: SecureRequest,
                              @Path("view") viewName: string): Promise<Dictionary<serializable>> {
-        const viewDefinition: ViewDefinition<any> = this.getViewDefinition(viewName, RequestMethod.GET, context);
-        return viewDefinition.getModel(undefined, request.params[0]);
+        const viewDefinition: ViewDefinition<any> = this.getViewDefinition(viewName);
+        return viewDefinition.getModel(context.language, request.params[0]);
     }
 
     @Get("/allowedValues/:view/:attribute", true)
@@ -188,7 +188,7 @@ export default class ViewGetController extends AbstractViewController {
                                                                                                        @Path("attribute") collectionField: keyof ENTITY,
                                                                                                        @Context() context: RequestContext<AbstractUser>): Promise<DataResponse<any>> {
 
-        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName, RequestMethod.GET, context);
+        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
 
         const collectionViewField: ViewFieldDefinition<ENTITY, SUBENTITY> | undefined = viewDefinition.fields
             .find((field: ViewFieldDefinition<ENTITY, SUBENTITY>) => field.name === collectionField);
@@ -203,13 +203,15 @@ export default class ViewGetController extends AbstractViewController {
             throw new UnsupportedOperationError("Cannot get allowed values.");
         }
 
-        const object: ENTITY = new (viewDefinition.entity)();
-
-        const allowedValues: DataResponse<SUBENTITY[]> = await ModelService.getAllowedValues(object, collectionViewField.name as keyof ENTITY, context);
-        const subViewDefinition: ViewDefinition<SUBENTITY> = this.viewService.getSelectionViewDefinition(entityField.classGetter());
+        const allowedValuesFilter: AbstractFilter = ModelService.getAllowedValuesFilter(viewDefinition.entity, collectionViewField.name as keyof ENTITY, context);
+        const subViewDefinition: ViewDefinition<SUBENTITY> = ViewInitializerService.getSelectionViewDefinition(entityField.classGetter());
+        // const data: View<SUBENTITY>[] = await this.viewService.findAll(subViewDefinition.viewClass, new UnrestrictedRequestContext(), allowedValuesFilter);
+        const data: DataObject<ENTITY>[] = await DataService.findAllRaw(subViewDefinition.entity, {
+            ...FilterService.toSequelize(allowedValuesFilter, subViewDefinition.entity),
+        });
         return {
-            data: allowedValues.data.map((o: SUBENTITY) => this.viewService.wrap(o, subViewDefinition)),
-            model: allowedValues.model,
+            data: data.map(d => this.viewHelperService.wrap(d, subViewDefinition)),
+            model: viewDefinition.getModel(context.language),
         };
     }
 }

@@ -4,5 +4,7 @@ import {AbstractUser} from "../../auth";
 export interface RequestContext<USER extends AbstractUser> {
     [key: string]: serializable;
 
+    language: string;
+
     currentUser?: USER;
 }

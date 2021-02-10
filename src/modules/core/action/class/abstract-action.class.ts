@@ -11,6 +11,10 @@ export abstract class AbstractAction {
 
     private $steps: Dictionary<ActionParameterConfiguration, number>;
 
+    public get hasOrigin(): boolean {
+        return !!this.$action.hasOrigin;
+    }
+
     public getSteps(): ActionParameterConfiguration[] {
         const entries: [string, ActionParameterConfiguration][] = Object.entries(this.$steps);
         entries.sort((a, b) => parseInt(a[0]) - parseInt(b[0]));

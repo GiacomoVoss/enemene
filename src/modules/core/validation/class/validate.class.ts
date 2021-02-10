@@ -1,44 +1,29 @@
+import {ValidateAnd} from "./validate-and.class";
+import {AbstractValidate} from "./abstract-validate.class";
+import {ValidateOr} from "./validate-or.class";
+import {ValidateNot} from "./validate-not.class";
+import {ValidateExists} from "./validate-exists.class";
+import {ValidateEquals} from "./validate-equals.class";
+
 export class Validate {
-    constructor(public name: string,
-                public args: Validate[] = [],
-                public parameters: any[] = []) {
 
+    public static and(...args: AbstractValidate[]): AbstractValidate {
+        return new ValidateAnd(args);
     }
 
-    public static and(...args: Validate[]): Validate {
-        return new Validate(
-            "and",
-            args,
-        );
+    public static or(...args: AbstractValidate[]): AbstractValidate {
+        return new ValidateOr(args);
     }
 
-    public static or(...args: Validate[]): Validate {
-        return new Validate(
-            "or",
-            args,
-        );
+    public static not(arg: AbstractValidate): AbstractValidate {
+        return new ValidateNot(arg);
     }
 
-    public static not(arg: Validate): Validate {
-        return new Validate(
-            "not",
-            [arg],
-        );
+    public static equals(field: string, value: string | number): AbstractValidate {
+        return new ValidateEquals(field, value);
     }
 
-    public static equals(field: string, value: string | number): Validate {
-        return new Validate(
-            "equals",
-            undefined,
-            [field, value]
-        );
-    }
-
-    public static exists(field: string): Validate {
-        return new Validate(
-            "exists",
-            undefined,
-            [field],
-        );
+    public static exists(field: string): AbstractValidate {
+        return new ValidateExists(field);
     }
 }

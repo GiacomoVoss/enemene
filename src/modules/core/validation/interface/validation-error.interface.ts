@@ -1,2 +1,2 @@
-export interface ValidationError {
+export class ValidationError {
 }

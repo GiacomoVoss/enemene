@@ -9,7 +9,7 @@ import {RequestMethod} from "../enum/request-method.enum";
 import {RuntimeError} from "../../application/error/runtime.error";
 import {SecureRequest} from "../../auth/interface/secure-request.interface";
 import {PermissionService} from "../../auth/service/permission.service";
-import {Enemene, FileController} from "../../../..";
+import {DataFileService, Enemene, FileController} from "../../../..";
 import {InputValidationError} from "../../validation/error/input-validation.error";
 import {Redirect} from "../class/redirect.class";
 import {ConstructorOf} from "../../../../base/constructor-of";
@@ -25,18 +25,15 @@ import ViewDeleteController from "../../view/view-delete.controller";
 import {ModelController} from "../../model/model.controller";
 import {FileService} from "../../file/service/file.service";
 import multer from "multer";
+import {ValidationFieldError} from "../../validation/interface/validation-field-error.interface";
+import {HttpHeader} from "../decorator/parameter/header.decorator";
 
 export class RouterService {
 
     private fileService: FileService = Enemene.app.inject(FileService);
+    private dataFileService: DataFileService = Enemene.app.inject(DataFileService);
 
-    public paths: Dictionary<Dictionary<PathDefinition>, RequestMethod> = {
-        [RequestMethod.GET]: {},
-        [RequestMethod.PUT]: {},
-        [RequestMethod.POST]: {},
-        [RequestMethod.POSTFILE]: {},
-        [RequestMethod.DELETE]: {},
-    };
+    public paths: Dictionary<Dictionary<PathDefinition>, RequestMethod> = {};
 
     private controllers: Dictionary<any> = {};
 
@@ -83,6 +80,11 @@ export class RouterService {
         const moduleName: string = router.prototype.$path;
         let fullPath: string = `/${moduleName}`;
         pathDefinition.controller = router;
+
+        if (!this.paths[pathDefinition.method]) {
+            this.paths[pathDefinition.method] = {};
+        }
+
         if (pathDefinition.path === "/") {
             this.paths[pathDefinition.method][fullPath] = pathDefinition;
             return;
@@ -112,6 +114,7 @@ export class RouterService {
                 ];
                 switch (pathDefinition.method) {
                     case RequestMethod.GET:
+                    case RequestMethod.GETFILE:
                         app.get(`/api${path}`, ...handlers, this.logError);
                         break;
                     case RequestMethod.POST:
@@ -184,6 +187,13 @@ export class RouterService {
             res.redirect(result.url);
         } else if (result instanceof CustomResponse) {
             res.status(result.status).send(result.data);
+        } else if (pathDefinition.method === RequestMethod.GETFILE) {
+            if (this.dataFileService.fileExists(result)) {
+                res.setHeader("Content-Type", await this.dataFileService.getMimeType(result));
+                res.sendFile(this.dataFileService.getIndexedFilePath(result, true));
+            } else {
+                res.status(404).end();
+            }
         } else {
             res.send(result);
         }
@@ -223,6 +233,7 @@ export class RouterService {
                     parameterValue = {
                         ...context,
                         currentUser: req.payload,
+                        language: req.header(HttpHeader.LANGUAGE)
                     };
                 }
                 break;
@@ -230,11 +241,7 @@ export class RouterService {
                 parameterValue = req.header(value);
         }
         if (parameterValue === undefined && !optional) {
-            throw new InputValidationError([{
-                type: "field",
-                field: `${paramType}.${value}`,
-                message: "required",
-            }]);
+            throw new InputValidationError([new ValidationFieldError(`${paramType}.${value}`, "required")], "Request", req.header(HttpHeader.LANGUAGE));
         }
 
         return parameterValue;

@@ -8,12 +8,21 @@ export declare class RuntimeError extends Error {
 }
 
 
-export class ObjectNotFoundError extends RuntimeError {
+export declare class ObjectNotFoundError extends RuntimeError {
 
     private details?: string;
 
     constructor(details?: string);
 
     toJSON(): object;
+}
+
+export declare class UnsupportedOperationError extends RuntimeError {
+    constructor(message: string);
+}
+
+
+export declare class IntegrityViolationError extends RuntimeError {
+    constructor();
 }
 

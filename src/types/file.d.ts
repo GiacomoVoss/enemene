@@ -11,3 +11,13 @@ export declare class File extends DataObject<File> {
 
     uploadedBy: uuid;
 }
+
+export declare class DataFileService {
+    public downloadAndSave(url: string, filename: string);
+
+    public fileExists(filePath: string): boolean;
+
+    public get(filename: string): Buffer;
+
+    public getMimeType(fileName: string): Promise<string>;
+}

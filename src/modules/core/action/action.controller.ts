@@ -1,7 +1,7 @@
 import {Body, Context, Path, Post} from "../router";
 import {AbstractAction} from "./class/abstract-action.class";
 import {ActionService} from "./service/action.service";
-import {ViewService} from "../view";
+import {ViewInitializerService} from "../view";
 import {AbstractController} from "../router/class/abstract-controller.class";
 import {AbstractUser, DataObject, DataService, Enemene} from "../../..";
 import {ActionStepResult} from "./class/action-step-result.class";
@@ -17,33 +17,37 @@ import {ActionOriginInput} from "./interface/action-origin-input.interface";
 import {PermissionService} from "../auth/service/permission.service";
 import {Controller} from "../router/decorator/controller.decorator";
 import {ViewDefinition} from "../view/class/view-definition.class";
+import {ViewHelperService} from "../view/service/view-helper.service";
 
 @Controller("action")
 export default class ActionController extends AbstractController {
 
     private actionService: ActionService = Enemene.app.inject(ActionService);
     private permissionService: PermissionService = Enemene.app.inject(PermissionService);
-    private viewService: ViewService = Enemene.app.inject(ViewService);
+    private viewHelperService: ViewHelperService = Enemene.app.inject(ViewHelperService);
 
     @Post("/:view/:action", true)
     async executeActionStep<ACTION extends AbstractAction>(@Context() context: RequestContext<AbstractUser>,
                                                            @Path("view") viewName: string,
                                                            @Path("action") actionName: string,
-                                                           @Body("origin") origin: ActionOriginInput,
-                                                           @Body("input") inputs: any[]): Promise<CustomResponse<ActionDataResponse<any> | null>> {
+                                                           @Body("input") inputs: any[],
+                                                           @Body("origin") origin?: ActionOriginInput): Promise<CustomResponse<ActionDataResponse<any> | null>> {
         const action: ACTION = this.actionService.getActionInstance(actionName);
-        this.permissionService.checkActionPermission(viewName, actionName, context);
+        this.permissionService.checkActionPermission(ViewInitializerService.getViewDefinition(viewName), actionName, context);
+        if (action.hasOrigin) {
+            this.actionService.validateActionOrigin(origin);
+        }
         let lastResult: ActionStepResult;
         let currentStep: ActionParameterConfiguration;
         const validatedInputs: any[] = [];
         for (const step of action.getSteps()) {
             const parameters: [ActionParameterType, number?][] = action.getParameters(step.value.name) ?? [];
-            const parameterValues: any[] = await Promise.all(parameters.map((param: [ActionParameterType, number?]) => this.actionService.resolveParameter(step, param, origin, validatedInputs)));
+            const parameterValues: any[] = await Promise.all(parameters.map((param: [ActionParameterType, number?]) => this.actionService.resolveParameter(step, param, origin, validatedInputs, context)));
             lastResult = await step.value.apply(action, parameterValues);
             currentStep = step;
 
             if (inputs[step.index]) {
-                validatedInputs.push(await this.actionService.validateActionInput(step, lastResult, inputs[step.index], context));
+                validatedInputs.push(await this.actionService.validateActionInput(step, lastResult, inputs[step.index], context, actionName));
             } else {
                 break;
             }
@@ -71,10 +75,10 @@ export default class ActionController extends AbstractController {
         if (lastResult.status === ActionResultStatus.SELECTION) {
             const selectionResult = lastResult as ActionStepResultSelection<any>;
             const viewDefinition: ViewDefinition<any> = selectionResult.view.prototype.$view;
-            const data: DataObject<any>[] = await DataService.findAllRaw(viewDefinition.entity, this.viewService.getFindOptions(viewDefinition, context));
+            const data: DataObject<any>[] = await DataService.findAllRaw(viewDefinition.entity, this.viewHelperService.getFindOptions(viewDefinition, context));
             return this.responseWithStatus(202, {
                 data: {
-                    data: data.map((object: DataObject<any>) => this.viewService.wrap(object, viewDefinition)),
+                    data: data.map((object: DataObject<any>) => this.viewHelperService.wrap(object, viewDefinition)),
                     model: viewDefinition.getModel(),
                 },
                 type: lastResult.status,

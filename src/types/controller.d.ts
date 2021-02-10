@@ -1,11 +1,11 @@
 import {AbstractUser} from "./auth";
-import {serializable} from "./base";
-import {Dictionary} from "../base/type/dictionary.type";
-import {ActionDefinition} from "../modules/core/action/interface/action-definition.interface";
+import {Dictionary, serializable} from "./base";
+import {ActionDefinition} from "./action";
 
 export declare enum RequestMethod {
     GET = "GET",
     POST = "POST",
+    GETFILE = "GETFILE",
     PUT = "PUT",
     DELETE = "DELETE"
 }
@@ -31,6 +31,11 @@ export interface DataResponse<ENTITY> {
     actions?: ActionDefinition[];
 }
 
+export declare class UnrestrictedRequestContext implements RequestContext<AbstractUser> {
+    [key: string]: serializable;
+
+    public destroy(): void;
+}
 
 export declare function Controller(path: string): Function;
 
@@ -41,6 +46,8 @@ export declare function Post(path: string, isPublic?: boolean): Function;
 export declare function Put(path: string, isPublic?: boolean): Function;
 
 export declare function Delete(path: string, isPublic?: boolean): Function;
+
+export declare function GetFile(path: string, isPublic?: boolean): Function;
 
 export declare function Body(key?: string): Function;
 
