@@ -32,7 +32,13 @@ export class ViewFindService {
                                                                                        options?: ViewFindOptions): Promise<VIEW[]> {
         this.checkPermission(viewClass, context);
         const viewDefinition: ViewDefinition<ENTITY> = ViewInitializerService.getViewDefinition(viewClass.name);
-        const data: DataObject<ENTITY>[] = await DataService.findAllRaw(viewDefinition.entity, this.viewHelperService.getFindOptions(viewDefinition, context, options, options?.searchString));
+        const data: DataObject<ENTITY>[] = await DataService.findAllRaw(viewDefinition.entity, {
+            ...this.viewHelperService.getFindOptions(viewDefinition, context, {
+                ...FilterService.toSequelize(filter, viewDefinition.entity),
+                ...options,
+            }, options?.searchString),
+            transaction: context.transaction,
+        });
         return data.map((object: DataObject<ENTITY>) => this.viewHelperService.wrap(object, viewDefinition)) as VIEW[];
     }
 
@@ -43,6 +49,7 @@ export class ViewFindService {
         const viewDefinition: ViewDefinition<ENTITY> = ViewInitializerService.getViewDefinition(viewClass.name);
         const data: DataObject<ENTITY>[] = await DataService.findAllRaw(viewDefinition.entity, {
             ...FilterService.toSequelize(filter, viewDefinition.entity),
+            transaction: context.transaction,
         });
         if (data.length !== 1) {
             throw new Error(); // TODO
@@ -56,7 +63,10 @@ export class ViewFindService {
                                                                                         context: RequestContext<AbstractUser>): Promise<VIEW | undefined> {
         this.checkPermission(viewClass, context);
         const viewDefinition: ViewDefinition<ENTITY> = ViewInitializerService.getViewDefinition(viewClass.name);
-        const data: DataObject<ENTITY> = await DataService.findById(viewDefinition.entity, objectId, this.viewHelperService.getFindOptions(viewDefinition, context));
+        const data: DataObject<ENTITY> = await DataService.findById(viewDefinition.entity, objectId, {
+            ...this.viewHelperService.getFindOptions(viewDefinition, context),
+            transaction: context.transaction,
+        });
         if (!data) {
             return undefined;
         }

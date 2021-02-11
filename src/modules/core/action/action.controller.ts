@@ -27,7 +27,7 @@ export default class ActionController extends AbstractController {
     private viewHelperService: ViewHelperService = Enemene.app.inject(ViewHelperService);
 
     @Post("/:view/:action", true)
-    async executeActionStep<ACTION extends AbstractAction>(@Context() context: RequestContext<AbstractUser>,
+    async executeActionStep<ACTION extends AbstractAction>(@Context context: RequestContext<AbstractUser>,
                                                            @Path("view") viewName: string,
                                                            @Path("action") actionName: string,
                                                            @Body("input") inputs: any[],

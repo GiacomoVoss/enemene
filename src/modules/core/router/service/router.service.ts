@@ -27,6 +27,7 @@ import {FileService} from "../../file/service/file.service";
 import multer from "multer";
 import {ValidationFieldError} from "../../validation/interface/validation-field-error.interface";
 import {HttpHeader} from "../decorator/parameter/header.decorator";
+import {Transaction} from "sequelize/types/lib/transaction";
 
 export class RouterService {
 
@@ -177,29 +178,37 @@ export class RouterService {
     }
 
     private async handle(req: SecureRequest, res: Response, next: Function, pathDefinition: PathDefinition): Promise<void> {
-        const parameterValues: any[] = pathDefinition.parameters.map((param: string[]) => this.resolveParameter(req, res, param));
+        const transaction: Transaction = await Enemene.app.db.transaction();
+        const parameterValues: any[] = pathDefinition.parameters.map((param: string[]) => this.resolveParameter(req, res, param, transaction));
         if (!this.controllers[pathDefinition.controller.name]) {
             Enemene.log.debug(this.constructor.name, `Instantiating ${pathDefinition.controller.name}.`);
             this.controllers[pathDefinition.controller.name] = new pathDefinition.controller();
         }
-        const result: any | Redirect | CustomResponse<any> = await pathDefinition.fn.apply(this.controllers[pathDefinition.controller.name], parameterValues);
-        if (result instanceof Redirect) {
-            res.redirect(result.url);
-        } else if (result instanceof CustomResponse) {
-            res.status(result.status).send(result.data);
-        } else if (pathDefinition.method === RequestMethod.GETFILE) {
-            if (this.dataFileService.fileExists(result)) {
-                res.setHeader("Content-Type", await this.dataFileService.getMimeType(result));
-                res.sendFile(this.dataFileService.getIndexedFilePath(result, true));
+
+        try {
+            const result: any | Redirect | CustomResponse<any> = await pathDefinition.fn.apply(this.controllers[pathDefinition.controller.name], parameterValues);
+            await transaction.commit();
+            if (result instanceof Redirect) {
+                res.redirect(result.url);
+            } else if (result instanceof CustomResponse) {
+                res.status(result.status).send(result.data);
+            } else if (pathDefinition.method === RequestMethod.GETFILE) {
+                if (this.dataFileService.fileExists(result)) {
+                    res.setHeader("Content-Type", await this.dataFileService.getMimeType(result));
+                    res.sendFile(this.dataFileService.getIndexedFilePath(result, true));
+                } else {
+                    res.status(404).end();
+                }
             } else {
-                res.status(404).end();
+                res.send(result);
             }
-        } else {
-            res.send(result);
+        } catch (e) {
+            await transaction.rollback();
+            throw e;
         }
     }
 
-    private resolveParameter(req: SecureRequest, res: Response, param: string[]): any {
+    private resolveParameter(req: SecureRequest, res: Response, param: string[], transaction: Transaction): any {
         const [paramType, value] = param;
         let context: Dictionary<string>;
         let parameterValue: any = undefined;
@@ -227,15 +236,12 @@ export class RouterService {
                 break;
             case ParameterType.CONTEXT:
                 context = req.query["context"] ? JSON.parse(req.query["context"] as string) : {};
-                if (value) {
-                    parameterValue = context[value];
-                } else {
-                    parameterValue = {
-                        ...context,
-                        currentUser: req.payload,
-                        language: req.header(HttpHeader.LANGUAGE)
-                    };
-                }
+                parameterValue = {
+                    ...context,
+                    currentUser: req.payload,
+                    language: req.header(HttpHeader.LANGUAGE),
+                    transaction,
+                };
                 break;
             case ParameterType.HEADER:
                 parameterValue = req.header(value);

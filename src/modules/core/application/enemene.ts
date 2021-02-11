@@ -45,7 +45,6 @@ export class Enemene {
         this.log = Enemene.log;
         this.log[config.logLevel.toLowerCase()]("Server", "Log level: " + config.logLevel.toUpperCase());
         this.config.port = `${this.normalizePort(config.port)}`;
-        UnrestrictedRequestContext.$userModel = config.userModel;
 
         this.db = new Sequelize({
             host: config.db.host,
@@ -57,6 +56,9 @@ export class Enemene {
             timezone: "+02:00",
             logging: sql => Enemene.log.silly("Database", sql),
         });
+
+        UnrestrictedRequestContext.$userModel = config.userModel;
+        UnrestrictedRequestContext.$db = this.db;
     }
 
     public static async create(config: EnemeneConfig): Promise<Enemene> {

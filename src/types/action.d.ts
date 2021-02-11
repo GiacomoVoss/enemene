@@ -3,6 +3,28 @@ import {ConstructorOf, uuid} from "./base";
 import {Dictionary} from "../base/type/dictionary.type";
 
 /**
+ * Define actions to simulate an input wizard consisting of multiple steps where user input is requested.
+ * An action can have multiple {@link View}s which either require the user to fill out a form or select one or more entries from a table.
+ * Define an action by creating a class extending {@link AbstractAction} annotated with {@link Action}.
+ * Within the action, steps can be defined by creating a method (the method's name is irrelevant) and annotate it with {@link ActionStep}.
+ * The step method must return an {@link ActionStepResult}, i.e. either one of these:
+ * <ul>
+ *     <li>{@link ActionStepResultForm} sends all information to display a form based on a view.</li>
+ *     <li>{@link ActionStepResultSelection} sends all information to display a selection table based on a view.</li>
+ *     <li>{@link ActionStepResultSuccess} sends the information that the last step of the action has been successfully executed.
+ * </ul>
+ *
+ * An action can be executed by requesting <code>POST /action/TheViewOnWhichTheActionShouldBeExecuted/TheActionName</code>.
+ * With every step, the client must always send all user inputs of previous and the current step in the body of the request.
+ *
+ * You can inject parameters in every action step method:
+ * <ul>
+ *     <li>{@link ActionOrigin} contains the {@link ActionOriginInput} of the executing, i.e. the view and the object(s) on which the action is executed.
+ *     <li>{@link ActionInput(index: number)} contains the input of the respective action step.
+ * </ul>
+ */
+
+/**
  * Annotate a class to declare it as an action.
  * @param config {ActionDefinition} The action's details.
  */

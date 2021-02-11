@@ -36,10 +36,6 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
 
     filter?(context: RequestContext<AbstractUser>): AbstractFilter;
 
-    creatable: boolean = false;
-    updatable: boolean = false;
-    deletable: boolean = false;
-
     searchAttributes?: string[];
 
     meta?: object;
@@ -63,15 +59,10 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
         this.filter = configuration?.filter;
         this.searchAttributes = configuration?.searchAttributes;
         this.meta = configuration?.meta;
-        this.creatable = configuration?.creatable ?? false;
-        this.updatable = configuration?.updatable ?? false;
-        this.deletable = configuration?.deletable ?? false;
 
         this.fields = fields.map(viewField => {
-            viewField.canCreate = viewField.canCreate ?? this.creatable;
-            viewField.canUpdate = viewField.canUpdate ?? this.updatable;
-            viewField.canInsert = viewField.isArray ? viewField.canInsert ?? this.updatable : false;
-            viewField.canRemove = viewField.isArray ? viewField.canRemove ?? this.updatable : false;
+            viewField.canInsert = viewField.isArray ? viewField.canInsert : false;
+            viewField.canRemove = viewField.isArray ? viewField.canRemove : false;
 
             return viewField;
         });

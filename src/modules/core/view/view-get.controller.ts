@@ -88,7 +88,7 @@ export default class ViewGetController extends AbstractViewController {
     @Get("/count/:view", true)
     async countObjects<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
                                                           @Query("search") search: string,
-                                                          @Context() context: RequestContext<AbstractUser>): Promise<object> {
+                                                          @Context context: RequestContext<AbstractUser>): Promise<object> {
         return {
             data: {
                 count: (await this.getObjects(viewName, "id", "", "", "", search, context, "")).data.length,
@@ -101,7 +101,7 @@ export default class ViewGetController extends AbstractViewController {
                                                                 @Path("id") objectId: string,
                                                                 @Query("search") search: string,
                                                                 @Req request: SecureRequest,
-                                                                @Context() context: RequestContext<AbstractUser>): Promise<object> {
+                                                                @Context context: RequestContext<AbstractUser>): Promise<object> {
         const response: DataResponse<ENTITY> = await this.getByPath(viewName, objectId, request, "id", context);
         let count = 0;
         if (!Array.isArray(response.data)) {
@@ -123,7 +123,7 @@ export default class ViewGetController extends AbstractViewController {
                                                         @Query("limit") limit: string,
                                                         @Query("offset") offset: string,
                                                         @Query("search") searchString: string,
-                                                        @Context() context: RequestContext<AbstractUser>,
+                                                        @Context context: RequestContext<AbstractUser>,
                                                         @Header(HttpHeader.LANGUAGE) language: string): Promise<DataResponse<ENTITY[]>> {
         const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
         const data: View<ENTITY>[] = await this.viewService.findAll(viewDefinition.viewClass, context, undefined, this.viewHelperService.parseFindOptions(order, limit, offset, searchString));
@@ -138,7 +138,7 @@ export default class ViewGetController extends AbstractViewController {
     async getObject<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
                                                        @Path("id") objectId: string,
                                                        @Query("fields") requestedFields: string,
-                                                       @Context() context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
+                                                       @Context context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
         const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
         return {
             data: this.filterFields(await this.viewService.findById(viewDefinition.viewClass, objectId, context), requestedFields) as Dictionary<any, keyof ENTITY>,
@@ -152,7 +152,7 @@ export default class ViewGetController extends AbstractViewController {
                                                        @Path("id") objectId: string,
                                                        @Req request: SecureRequest,
                                                        @Query("fields") requestedFields: string,
-                                                       @Context() context: RequestContext<AbstractUser>): Promise<DataResponse<any>> {
+                                                       @Context context: RequestContext<AbstractUser>): Promise<DataResponse<any>> {
         const attributePath = request.params[0];
         if (!attributePath || !attributePath.length) {
             return this.getObject(viewName, objectId, requestedFields, context);
@@ -169,14 +169,14 @@ export default class ViewGetController extends AbstractViewController {
     }
 
     @Get("/model/:view", true)
-    async getViewModel(@Context() context: RequestContext<AbstractUser>,
+    async getViewModel(@Context context: RequestContext<AbstractUser>,
                        @Path("view") viewName: string): Promise<Dictionary<serializable>> {
         const viewDefinition: ViewDefinition<any> = this.getViewDefinition(viewName);
         return viewDefinition.getModel();
     }
 
     @Get("/model/:view/*", true)
-    async getViewModelByPath(@Context() context: RequestContext<AbstractUser>,
+    async getViewModelByPath(@Context context: RequestContext<AbstractUser>,
                              @Req request: SecureRequest,
                              @Path("view") viewName: string): Promise<Dictionary<serializable>> {
         const viewDefinition: ViewDefinition<any> = this.getViewDefinition(viewName);
@@ -186,7 +186,7 @@ export default class ViewGetController extends AbstractViewController {
     @Get("/allowedValues/:view/:attribute", true)
     async getAllowedValues<ENTITY extends DataObject<ENTITY>, SUBENTITY extends DataObject<SUBENTITY>>(@Path("view") viewName: string,
                                                                                                        @Path("attribute") collectionField: keyof ENTITY,
-                                                                                                       @Context() context: RequestContext<AbstractUser>): Promise<DataResponse<any>> {
+                                                                                                       @Context context: RequestContext<AbstractUser>): Promise<DataResponse<any>> {
 
         const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
 

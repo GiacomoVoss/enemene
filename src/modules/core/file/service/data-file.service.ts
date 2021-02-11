@@ -19,25 +19,27 @@ export class DataFileService {
      * @param fileName
      */
     public async downloadAndSave(url: string, fileName: uuid = UuidService.getUuid()): Promise<uuid | undefined> {
-        const filePath: string = this.getIndexedFilePath(fileName, true);
-        const filePathTokens: string[] = filePath.split(path.sep);
-        filePathTokens.pop();
-        const dir: string = filePathTokens.join(path.sep);
-        await mkdirp(dir);
-        return fetch(url).then(res => {
-            const destination = fs.createWriteStream(filePath);
-            res.body.pipe(destination);
-            if (!fs.existsSync(filePath)) {
-                return undefined;
-            }
-            if (fs.statSync(filePath).size === 0) {
-                fs.unlinkSync(filePath);
-                return undefined;
-            } else {
-                Enemene.log.debug(this.constructor.name, `Saved ${filePath} (${fs.statSync(filePath).size})`);
-                return fileName;
-            }
-        });
+        if (url && url.length) {
+            const filePath: string = this.getIndexedFilePath(fileName, true);
+            const filePathTokens: string[] = filePath.split(path.sep);
+            filePathTokens.pop();
+            const dir: string = filePathTokens.join(path.sep);
+            await mkdirp(dir);
+            return fetch(url).then(res => {
+                const destination = fs.createWriteStream(filePath);
+                res.body.pipe(destination);
+                if (!fs.existsSync(filePath)) {
+                    return undefined;
+                }
+                if (fs.statSync(filePath).size === 0) {
+                    fs.unlinkSync(filePath);
+                    return undefined;
+                } else {
+                    Enemene.log.debug(this.constructor.name, `Saved ${filePath} (${fs.statSync(filePath).size})`);
+                    return fileName;
+                }
+            });
+        }
     }
 
     /**

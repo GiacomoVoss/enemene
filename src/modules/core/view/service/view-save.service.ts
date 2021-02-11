@@ -24,19 +24,9 @@ export class ViewSaveService {
     private permissionService: PermissionService = Enemene.app.inject(PermissionService);
 
     public async save<ENTITY extends DataObject<ENTITY>>(view: View<ENTITY>,
-                                                         context: RequestContext<AbstractUser>,
-                                                         transaction?: Transaction): Promise<View<ENTITY>> {
-        const t: Transaction = transaction ?? await Enemene.app.db.transaction();
-        try {
-            const viewId: uuid = await this.saveInTransaction(t, view, context);
-            if (!transaction) {
-                await t.commit();
-            }
-            return this.viewFindService.findById(view.$view.viewClass, viewId, context);
-        } catch (e) {
-            await t.rollback();
-            throw e;
-        }
+                                                         context: RequestContext<AbstractUser>): Promise<View<ENTITY>> {
+        const viewId: uuid = await this.saveInTransaction(context.transaction, view, context);
+        return this.viewFindService.findById(view.$view.viewClass, viewId, context);
     }
 
     private async saveInTransaction<ENTITY extends DataObject<ENTITY>>(transaction: Transaction,
@@ -49,7 +39,7 @@ export class ViewSaveService {
         }
         this.validationService.validateView(view, context);
 
-        const object: DataObject<ENTITY> = view.id ? await DataService.findById(view.$view.entity, view.id, undefined, transaction) : new view.$view.entity();
+        const object: DataObject<ENTITY> = view.id ? await DataService.findById(view.$view.entity, view.id, {transaction}) : new view.$view.entity();
         const rawObject: any = object.toJSON();
         const fields: Dictionary<EntityField, keyof ENTITY> = ModelService.getFields(view.$view.entity.name);
         for (const [key, newValue] of Object.entries(view)) {

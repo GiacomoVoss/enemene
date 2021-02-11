@@ -17,13 +17,14 @@ export default class ViewPostController extends AbstractViewController {
     @Post("/:view", true)
     async createObject<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
                                                           @Body() data: Dictionary<serializable>,
-                                                          @Context() context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
+                                                          @Context context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
         const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
         const view = new viewDefinition.viewClass();
         view.setValues(data, context);
+        const savedData: View<ENTITY> = await this.viewService.save(view, context);
 
         return {
-            data: await this.viewService.save(view, context),
+            data: savedData,
             model: viewDefinition.getModel(),
         };
     }
@@ -33,7 +34,7 @@ export default class ViewPostController extends AbstractViewController {
                                                           @Path("id") objectId: uuid,
                                                           @Req request: SecureRequest,
                                                           @Body() data: Dictionary<serializable>,
-                                                          @Context() context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
+                                                          @Context context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
 
         const attributePath = request.params[0];
         if (!attributePath || !attributePath.length) {

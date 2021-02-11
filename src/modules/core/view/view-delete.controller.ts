@@ -21,7 +21,7 @@ export default class ViewDeleteController extends AbstractViewController {
     @Delete("/:view/:id", true)
     async deleteObject<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
                                                           @Path("id") objectId: uuid,
-                                                          @Context() context: RequestContext<AbstractUser>): Promise<void> {
+                                                          @Context context: RequestContext<AbstractUser>): Promise<void> {
         const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
 
         Enemene.app.inject(PermissionService).checkViewPermission(viewDefinition.viewClass, RequestMethod.DELETE, context);
@@ -36,8 +36,7 @@ export default class ViewDeleteController extends AbstractViewController {
                                                           @Path("id") objectId: uuid,
                                                           @Req request: SecureRequest,
                                                           @Body() data: Dictionary<serializable>,
-                                                          @Context() context: RequestContext<AbstractUser>): Promise<void> {
-
+                                                          @Context context: RequestContext<AbstractUser>): Promise<void> {
         const attributePath = request.params[0];
         if (!attributePath || !attributePath.length) {
             return this.deleteObject(viewName, objectId, context);

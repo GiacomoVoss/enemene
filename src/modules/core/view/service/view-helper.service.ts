@@ -133,7 +133,7 @@ export class ViewHelperService {
         }
 
         this.addIncludeAndAttributes(viewDefinition.entity.name, viewDefinition.fields, find);
-
+        find.transaction = context.transaction;
         return find;
     }
 

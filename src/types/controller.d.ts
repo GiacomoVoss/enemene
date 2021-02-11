@@ -1,6 +1,7 @@
 import {AbstractUser} from "./auth";
 import {Dictionary, serializable} from "./base";
 import {ActionDefinition} from "./action";
+import {Transaction} from "sequelize/types/lib/transaction";
 
 export declare enum RequestMethod {
     GET = "GET",
@@ -14,6 +15,8 @@ export declare interface RequestContext<USER extends AbstractUser> {
     [key: string]: serializable;
 
     currentUser?: USER;
+
+    transaction: Transaction;
 }
 
 export declare abstract class AbstractController {
@@ -34,7 +37,9 @@ export interface DataResponse<ENTITY> {
 export declare class UnrestrictedRequestContext implements RequestContext<AbstractUser> {
     [key: string]: serializable;
 
-    public destroy(): void;
+    transaction: Transaction;
+
+    public static create<T extends any>(callback: (UNRESTRICTED: RequestContext<AbstractUser>) => Promise<T>): Promise<T>;
 }
 
 export declare function Controller(path: string): Function;
@@ -51,7 +56,7 @@ export declare function GetFile(path: string, isPublic?: boolean): Function;
 
 export declare function Body(key?: string): Function;
 
-export declare function Context(key?: string): Function;
+export declare function Context(target, propertyKey, parameterIndex: number): void;
 
 export declare function Header(key: HttpHeader): Function;
 

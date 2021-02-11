@@ -86,25 +86,6 @@ export class PermissionService {
     }
 
     public checkViewPermission(view: ConstructorOf<View<any>>, method: RequestMethod, context: RequestContext<AbstractUser>): void {
-        let viewRequestAllowed: boolean = false;
-        switch (method) {
-            case RequestMethod.GET:
-                viewRequestAllowed = true;
-                break;
-            case RequestMethod.PUT:
-                viewRequestAllowed = view.prototype.$view.updatable;
-                break;
-            case RequestMethod.POST:
-                viewRequestAllowed = view.prototype.$view.creatable;
-                break;
-            case RequestMethod.DELETE:
-                viewRequestAllowed = view.prototype.$view.deletable;
-                break;
-        }
-        if (!viewRequestAllowed) {
-            throw new ForbiddenError();
-        }
-
         if (context instanceof UnrestrictedRequestContext) {
             return;
         }

@@ -3,7 +3,6 @@ import {DataObject} from "../../model/data-object.model";
 import {FindOptions} from "sequelize";
 import {Enemene} from "../../application/enemene";
 import {BeforeDeleteHook} from "../interface/before-delete-hook.interface";
-import {Transaction} from "sequelize/types/lib/transaction";
 import {RequestContext} from "../../router/interface/request-context.interface";
 import {AbstractUser} from "../../auth";
 import {AbstractFilter, FilterService} from "../../filter";
@@ -92,10 +91,9 @@ export class DataService {
     }
 
 
-    public static async findNotNullById<ENTITY extends DataObject<ENTITY>>(clazz: any, id: number | string, options?: FindOptions, transaction?: Transaction): Promise<ENTITY> {
+    public static async findNotNullById<ENTITY extends DataObject<ENTITY>>(clazz: any, id: number | string, options?: FindOptions): Promise<ENTITY> {
         const object: ENTITY = await clazz.findByPk(id, {
             ...options,
-            transaction,
         });
         if (!object) {
             throw new ObjectNotFoundError(clazz.name);
@@ -104,10 +102,9 @@ export class DataService {
     }
 
 
-    public static async findById<ENTITY extends DataObject<ENTITY>>(clazz: any, id: number | string, options: FindOptions = {}, transaction?: Transaction): Promise<ENTITY | null> {
+    public static async findById<ENTITY extends DataObject<ENTITY>>(clazz: any, id: number | string, options: FindOptions = {}): Promise<ENTITY | null> {
         const object: ENTITY = await clazz.findByPk(id, {
             ...options,
-            transaction,
         });
         if (!object) {
             return null;
@@ -115,22 +112,10 @@ export class DataService {
         return object;
     }
 
-    public static async delete<T extends DataObject<T>>(object: DataObject<T>, context: RequestContext<AbstractUser>, transaction?: Transaction): Promise<void> {
-
-        const t = transaction ?? await Enemene.app.db.transaction();
-        try {
-            if ((object as unknown as BeforeDeleteHook).onBeforeDelete) {
-                await (object as unknown as BeforeDeleteHook).onBeforeDelete(context);
-            }
-            await object.destroy({transaction: t});
-            if (!transaction) {
-                await t.commit();
-            }
-        } catch (e) {
-            if (!transaction) {
-                await t.rollback();
-            }
-            throw e;
+    public static async delete<T extends DataObject<T>>(object: DataObject<T>, context: RequestContext<AbstractUser>): Promise<void> {
+        if ((object as unknown as BeforeDeleteHook).onBeforeDelete) {
+            await (object as unknown as BeforeDeleteHook).onBeforeDelete(context);
         }
+        await object.destroy({transaction: context.transaction});
     }
 }
