@@ -44,7 +44,7 @@ export class ModelService {
         if (!(object instanceof DataObject)) {
             return [];
         }
-        
+
         const matches: RegExpMatchArray | null = object.$displayPattern.match(/\{\w+\}/g);
         if (matches) {
             fields = matches.map((token: string) => token.replace(/[}{]/g, ""));
@@ -117,7 +117,6 @@ export class ModelService {
 
                     if (entityField.type === EntityFieldType.PASSWORD) {
                         options.set = function (this: Model, value: string) {
-                            console.log(propertyKey, value, genSaltSync());
                             this.setDataValue(propertyKey as keyof Model, bcrypt.hashSync(value, genSaltSync()) as any);
                         };
                     }
@@ -182,8 +181,8 @@ export class ModelService {
                             db.model(modelName).hasMany(db.model(entityField.classGetter().name), {
                                 as: propertyKey,
                                 foreignKey: {
-                                    field: entityField.foreignKey,
-                                    name: entityField.foreignKey,
+                                    field: mappedField.name + "Id",
+                                    name: mappedField.name + "Id",
                                     allowNull: !mappedField.required,
                                 },
                                 onUpdate: entityField.required ? "RESTRICT" : "SET NULL",
