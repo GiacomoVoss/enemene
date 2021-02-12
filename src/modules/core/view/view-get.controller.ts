@@ -41,7 +41,10 @@ export default class ViewGetController extends AbstractViewController {
         return recurse(jsonobj, prefix);
     }
 
-    private filterFields<VIEW extends View<any>>(object: VIEW, fieldsString?: string): Dictionary<serializable> | Dictionary<serializable>[] {
+    private filterFields<VIEW extends View<any>>(object: VIEW, fieldsString?: string): Dictionary<serializable> | Dictionary<serializable>[] | undefined {
+        if (!object) {
+            return undefined;
+        }
         const data: any = object.toJSON();
         if (!fieldsString) {
             return data;

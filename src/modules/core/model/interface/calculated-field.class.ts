@@ -8,7 +8,7 @@ export class CalculatedField extends EntityField {
                 public fn: Function,
                 public includeFields: string[] = []) {
         super(name, label, EntityFieldType.CALCULATED, false);
-        this.isSimpleField = true;
+        this.isSimpleField = false;
     }
 
     public toJSON(): any {

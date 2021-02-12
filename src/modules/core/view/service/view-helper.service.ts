@@ -31,6 +31,9 @@ export class ViewHelperService {
 
                 const key: keyof ENTITY = fieldName as keyof ENTITY;
                 let value: any = object[key];
+                if (typeof value === "function") {
+                    value = value.apply(object);
+                }
                 if (entityField.isSimpleField) {
                     view[fieldName] = (object.toJSON ? object.toJSON()?.[key] : object[key]) ?? null;
                 } else {
@@ -160,16 +163,15 @@ export class ViewHelperService {
             if (!entityField) {
                 throw new UnsupportedOperationError(`Unknown field ${chalk.bold(fieldName)} in entity ${chalk.bold(entity)}.`);
             }
-            if (entityField.isSimpleField || entityField instanceof CalculatedField) {
+            if (entityField.isSimpleField) {
                 (findOptions.attributes as string[]).push(fieldName);
-                if (entityField instanceof CalculatedField) {
-                    const includes: ViewFieldDefinition<any, any>[] = entityField.includeFields
-                        .filter((f: string) => !f.includes("."))
-                        .map((f: string, position: number) => new ViewFieldDefinition<any, any>(f as any, entityField.type, {
-                            position,
-                        }));
-                    this.addIncludeAndAttributes(entity, includes, findOptions);
-                }
+            } else if (entityField instanceof CalculatedField) {
+                const includes: ViewFieldDefinition<any, any>[] = entityField.includeFields
+                    .filter((f: string) => !f.includes("."))
+                    .map((f: string, position: number) => new ViewFieldDefinition<any, any>(f as any, entityField.type, {
+                        position,
+                    }));
+                this.addIncludeAndAttributes(entity, includes, findOptions);
             } else {
                 const include: IncludeOptions = {model: (entityField as ReferenceField).classGetter(), as: fieldName, required: false};
                 if (field.subView) {

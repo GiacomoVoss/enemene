@@ -41,6 +41,10 @@ export class ModelService {
     public static getDisplayPatternFields(entity: string): EntityField[] {
         const object: DataObject<any> = Enemene.app.db.model(entity).build() as DataObject<any>;
         let fields: string[] = [];
+        if (!(object instanceof DataObject)) {
+            return [];
+        }
+        
         const matches: RegExpMatchArray | null = object.$displayPattern.match(/\{\w+\}/g);
         if (matches) {
             fields = matches.map((token: string) => token.replace(/[}{]/g, ""));
@@ -121,7 +125,7 @@ export class ModelService {
                     if (entityField.type === EntityFieldType.CALCULATED) {
                         options.type = DataTypes.VIRTUAL;
                         options.get = function (this: Model) {
-                            (entityField as CalculatedField).fn.apply(this);
+                            return (entityField as CalculatedField).fn.apply(this);
                         };
                     }
 
