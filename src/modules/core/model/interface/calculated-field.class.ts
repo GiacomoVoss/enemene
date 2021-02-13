@@ -6,6 +6,7 @@ export class CalculatedField extends EntityField {
                 public label: string | string[],
                 public returnType: EntityFieldType,
                 public fn: Function,
+                public classGetter?: () => any,
                 public includeFields: string[] = []) {
         super(name, label, EntityFieldType.CALCULATED, false);
         this.isSimpleField = false;

@@ -12,7 +12,7 @@ import {ObjectNotFoundError} from "../../error/object-not-found.error";
 import {RequestContext} from "../../router/interface/request-context.interface";
 import {ViewDefinition} from "../../view/class/view-definition.class";
 import {serializable} from "../../../../base/type/serializable.type";
-import {keyBy, uniq} from "lodash";
+import {keyBy} from "lodash";
 import {ConstructorOf} from "../../../../base/constructor-of";
 
 export class PermissionService {
@@ -51,9 +51,6 @@ export class PermissionService {
             throw new UnauthorizedError();
         }
 
-        if (Enemene.app.config.developerRoleId && user.roleId === Enemene.app.config.developerRoleId) {
-            return;
-        }
         const rolePermission: RoutePermission = this.permissionCache[user.roleId]?.route[fullPath]?.find((permission: RoutePermission) => permission.method === pathDefinition.method);
         if (!rolePermission) {
             throw new ObjectNotFoundError();
@@ -93,23 +90,10 @@ export class PermissionService {
         let viewPermission: ViewPermission;
         if (!context.currentUser) {
             viewPermission = this.permissionCache["PUBLIC"]?.view[view.name];
-        } else if (Enemene.app.config.developerRoleId && context.currentUser.roleId === Enemene.app.config.developerRoleId) {
-            const permissions = [];
-            for (const role of Object.values(this.permissionCache)) {
-                const permission: ViewPermission | undefined = role.view[view.name];
-                if (permission) {
-                    permissions.push(...permission.getPermissions());
-                }
-            }
-            if (permissions.length) {
-                viewPermission = new ViewPermission({
-                    view: view.name,
-                    permissions: uniq(permissions).join(""),
-                });
-            }
         } else {
             viewPermission = this.permissionCache[context.currentUser.roleId]?.view[view.name] ?? this.permissionCache["PUBLIC"]?.view[view.name];
         }
+
         if (!viewPermission) {
             throw new ObjectNotFoundError("ViewPermission");
         }
@@ -117,7 +101,7 @@ export class PermissionService {
         let permitted: boolean = false;
         switch (method) {
             case RequestMethod.GET:
-                permitted = viewPermission.getPermissions().includes(Permission.READ);
+                permitted = viewPermission.getPermissions().includes(Permission.READ) || viewPermission.getPermissions().includes(Permission.UPDATE) || viewPermission.getPermissions().includes(Permission.DELETE);
                 break;
             case RequestMethod.PUT:
                 permitted = viewPermission.getPermissions().includes(Permission.UPDATE);
@@ -135,11 +119,19 @@ export class PermissionService {
     }
 
     private registerPermission(permission: RoutePermission | ViewPermission) {
+        const developerRoleId: uuid | undefined = Enemene.app.config.developerRoleId;
         if (!permission.roleId) {
             permission.roleId = "PUBLIC";
         }
         if (!this.permissionCache[permission.roleId]) {
             this.permissionCache[permission.roleId] = {
+                route: {},
+                view: {},
+            };
+        }
+
+        if (developerRoleId && !this.permissionCache[developerRoleId]) {
+            this.permissionCache[developerRoleId] = {
                 route: {},
                 view: {},
             };
@@ -154,9 +146,18 @@ export class PermissionService {
                 this.permissionCache[routePermission.roleId].route[routePermission.route] = [];
             }
             this.permissionCache[routePermission.roleId].route[routePermission.route].push(routePermission);
+            if (developerRoleId) {
+                if (!this.permissionCache[developerRoleId].route[routePermission.route]) {
+                    this.permissionCache[developerRoleId].route[routePermission.route] = [];
+                }
+                this.permissionCache[developerRoleId].route[routePermission.route].push(routePermission);
+            }
         } else if ((permission as ViewPermission).view) {
             const viewPermission = permission as ViewPermission;
             this.permissionCache[viewPermission.roleId].view[viewPermission.view] = viewPermission;
+            if (developerRoleId) {
+                this.permissionCache[developerRoleId].view[viewPermission.view] = viewPermission;
+            }
         }
     }
 }

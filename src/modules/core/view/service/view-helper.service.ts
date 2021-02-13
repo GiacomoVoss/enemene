@@ -43,16 +43,20 @@ export class ViewHelperService {
                             if (viewField.subView) {
                                 const subViewDefinition: ViewDefinition<any> = viewField.subView.prototype.$view;
                                 return this.wrap(subValue as unknown as DataObject<ENTITY>, subViewDefinition, subViewDefinition.entity.name) as any;
-                            } else {
+                            } else if ((entityField as ReferenceField).classGetter) {
                                 return typeof subValue === "string" ? subValue : this.wrap(subValue, ViewInitializerService.getSelectionViewDefinition((entityField as ReferenceField).classGetter()), (entityField as ReferenceField).classGetter().name);
+                            } else {
+                                return subValue;
                             }
                         });
                     } else if (value !== null && value !== undefined) {
                         if (viewField.subView) {
                             const subViewDefinition: ViewDefinition<any> = viewField.subView.prototype.$view;
                             view[fieldName] = this.wrap(value as unknown as DataObject<ENTITY>, subViewDefinition, subViewDefinition.entity.name) as any;
-                        } else {
+                        } else if ((entityField as ReferenceField).classGetter) {
                             view[fieldName] = typeof value === "string" ? value : this.wrap(value, ViewInitializerService.getSelectionViewDefinition((entityField as ReferenceField).classGetter()), (entityField as ReferenceField).classGetter().name);
+                        } else {
+                            view[fieldName] = value;
                         }
                     } else {
                         view[fieldName] = null;

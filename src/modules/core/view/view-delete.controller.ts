@@ -27,7 +27,6 @@ export default class ViewDeleteController extends AbstractViewController {
         Enemene.app.inject(PermissionService).checkViewPermission(viewDefinition.viewClass, RequestMethod.DELETE, context);
 
         const object: DataObject<ENTITY> = await DataService.findNotNullById(viewDefinition.entity, objectId, this.viewHelperService.getFindOptions(viewDefinition, context));
-
         await DataService.delete(object, context);
     }
 

@@ -24,7 +24,9 @@ export class DataFileService {
             const filePathTokens: string[] = filePath.split(path.sep);
             filePathTokens.pop();
             const dir: string = filePathTokens.join(path.sep);
-            await mkdirp(dir);
+            if (!fs.existsSync(dir)) {
+                await mkdirp(dir);
+            }
             return fetch(url).then(res => {
                 const destination = fs.createWriteStream(filePath);
                 res.body.pipe(destination);
