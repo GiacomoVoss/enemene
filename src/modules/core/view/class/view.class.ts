@@ -21,6 +21,8 @@ export abstract class View<ENTITY extends DataObject<ENTITY>> {
 
     public $displayPattern: string = "{id}";
 
+    public isNew: boolean = true;
+
     public setValues(data: Dictionary<serializable>, context: RequestContext<AbstractUser>): void {
         const entityFields: Dictionary<EntityField, keyof ENTITY> = ModelService.getFields(this.$view.entity.name);
         for (const fieldDefinition of this.$view.fields) {

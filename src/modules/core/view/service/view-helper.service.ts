@@ -67,6 +67,7 @@ export class ViewHelperService {
 
         view.id = object.id;
         view.$displayPattern = object.$displayPattern;
+        view.isNew = object.isNewRecord;
 
         return view;
     }

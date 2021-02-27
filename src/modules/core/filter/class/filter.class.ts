@@ -9,6 +9,7 @@ import {FilterIn} from "./filter-in.class";
 import {FilterTrue} from "./filter-true.class";
 import {AbstractFilter} from "./abstract-filter.class";
 import {FilterGreaterOrEqual} from "./filter-greater-or-equal.class";
+import {FilterLessOrEqual} from "./filter-less-or-equal.class";
 
 export class Filter {
 
@@ -30,6 +31,10 @@ export class Filter {
 
     public static greaterOrEqual(field: string, value: number | Date): AbstractFilter {
         return new FilterGreaterOrEqual(field, value);
+    }
+
+    public static lessOrEqual(field: string, value: number | Date): AbstractFilter {
+        return new FilterLessOrEqual(field, value);
     }
 
     public static exists(field: string, arg?: AbstractFilter): AbstractFilter {

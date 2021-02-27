@@ -1,13 +1,12 @@
 import path from "path";
 import fs from "fs";
-import fetch from "node-fetch";
 import {FileService} from "./file.service";
 import mkdirp from "mkdirp";
 import {Enemene} from "../../application/enemene";
 import {Magic, MAGIC_MIME_TYPE} from "mmmagic";
 import {uuid} from "../../../../base/type/uuid.type";
 import {UuidService} from "../../service/uuid.service";
-
+import https from "https";
 
 export class DataFileService {
 
@@ -27,19 +26,22 @@ export class DataFileService {
             if (!fs.existsSync(dir)) {
                 await mkdirp(dir);
             }
-            return fetch(url).then(res => {
-                const destination = fs.createWriteStream(filePath);
-                res.body.pipe(destination);
-                if (!fs.existsSync(filePath)) {
-                    return undefined;
-                }
-                if (fs.statSync(filePath).size === 0) {
-                    fs.unlinkSync(filePath);
-                    return undefined;
-                } else {
-                    Enemene.log.debug(this.constructor.name, `Saved ${filePath} (${fs.statSync(filePath).size})`);
-                    return fileName;
-                }
+            
+            const destination = fs.createWriteStream(filePath);
+            return new Promise((resolve, reject) => {
+                https.get(url, res => {
+                    res.pipe(destination);
+                    destination.on("finish", () => {
+                        destination.close();
+                        if (!destination.bytesWritten) {
+                            reject("No bytes written.");
+                            return;
+                        }
+                        Enemene.log.debug(this.constructor.name, `Saved ${filePath} (${fs.statSync(filePath).size})`);
+                        resolve(fileName);
+                        return;
+                    });
+                });
             });
         }
     }

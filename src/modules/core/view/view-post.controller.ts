@@ -29,6 +29,23 @@ export default class ViewPostController extends AbstractViewController {
         };
     }
 
+    @Post("/:view/:id", true)
+    async createObjectWithId<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
+                                                                @Path("id") objectId: uuid,
+                                                                @Body() data: Dictionary<serializable>,
+                                                                @Context context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
+        const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
+        const view = new viewDefinition.viewClass();
+        view.setValues(data, context);
+        view.id = objectId;
+        const savedData: View<ENTITY> = await this.viewService.save(view, context);
+
+        return {
+            data: savedData,
+            model: viewDefinition.getModel(),
+        };
+    }
+
     @Post("/:view/:id/*", true)
     async createInPath<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
                                                           @Path("id") objectId: uuid,

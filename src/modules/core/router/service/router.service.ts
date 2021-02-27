@@ -178,7 +178,10 @@ export class RouterService {
     }
 
     private async handle(req: SecureRequest, res: Response, next: Function, pathDefinition: PathDefinition): Promise<void> {
-        const transaction: Transaction = await Enemene.app.db.transaction();
+        let transaction: Transaction | undefined = undefined;
+        if (![RequestMethod.GET, RequestMethod.GETFILE].includes(pathDefinition.method)) {
+            transaction = await Enemene.app.db.transaction();
+        }
         const parameterValues: any[] = pathDefinition.parameters.map((param: string[]) => this.resolveParameter(req, res, param, transaction));
         if (!this.controllers[pathDefinition.controller.name]) {
             Enemene.log.debug(this.constructor.name, `Instantiating ${pathDefinition.controller.name}.`);
@@ -187,7 +190,9 @@ export class RouterService {
 
         try {
             const result: any | Redirect | CustomResponse<any> = await pathDefinition.fn.apply(this.controllers[pathDefinition.controller.name], parameterValues);
-            await transaction.commit();
+            if (transaction) {
+                await transaction.commit();
+            }
             if (result instanceof Redirect) {
                 res.redirect(result.url);
             } else if (result instanceof CustomResponse) {

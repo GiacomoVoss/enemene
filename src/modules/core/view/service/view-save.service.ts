@@ -32,14 +32,14 @@ export class ViewSaveService {
     private async saveInTransaction<ENTITY extends DataObject<ENTITY>>(transaction: Transaction,
                                                                        view: View<ENTITY>,
                                                                        context: RequestContext<AbstractUser>): Promise<uuid> {
-        if (!view.id) {
+        if (view.isNew) {
             this.checkPermission(view.$view, RequestMethod.POST, context);
         } else {
             this.checkPermission(view.$view, RequestMethod.PUT, context);
         }
         this.validationService.validateView(view, context);
 
-        const object: DataObject<ENTITY> = view.id ? await DataService.findById(view.$view.entity, view.id, {transaction}) : new view.$view.entity();
+        const object: DataObject<ENTITY> = view.isNew ? new view.$view.entity() : await DataService.findById(view.$view.entity, view.id, {transaction});
         const rawObject: any = object.toJSON();
         const fields: Dictionary<EntityField, keyof ENTITY> = ModelService.getFields(view.$view.entity.name);
         for (const [key, newValue] of Object.entries(view)) {
@@ -101,6 +101,7 @@ export class ViewSaveService {
         await object.save({transaction});
         await this.executeAfterHooks(object, context, isNewRecord);
         view.id = object.id;
+        view.isNew = false;
         return object.id;
     }
 

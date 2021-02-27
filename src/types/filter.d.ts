@@ -17,6 +17,8 @@ export declare class Filter {
 
     public static greaterOrEqual(field: string, value: number | Date): AbstractFilter;
 
+    public static lessOrEqual(field: string, value: number | Date): AbstractFilter;
+    
     public static exists(field: string, arg?: AbstractFilter): AbstractFilter;
 
     public static like(field: string, value: string): AbstractFilter;
