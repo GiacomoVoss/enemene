@@ -7,30 +7,32 @@ import {AbstractUser} from "../../auth";
 
 export class ViewFieldDefinition<ENTITY extends DataObject<ENTITY>, SUBENTITY extends DataObject<SUBENTITY>> {
     public name: keyof View<ENTITY>;
+    public description?: string | string[];
     public position: number;
     public required: boolean;
     public fieldType?: any;
     public subView?: ConstructorOf<View<SUBENTITY>>;
     public isArray: boolean = false;
-    public canUpdate?: boolean = false;
-    public canCreate?: boolean = false;
-    public canInsert?: boolean = false;
-    public canRemove?: boolean = false;
-    public default: (context: RequestContext<AbstractUser>) => any;
+    public canUpdate?: boolean;
+    public canCreate?: boolean;
+    public canInsert?: boolean;
+    public canRemove?: boolean;
+    public default: (context?: RequestContext<AbstractUser>) => any;
     private meta?: any;
 
     constructor(name: keyof View<ENTITY>, fieldType: any, configuration: ViewFieldConfiguration<SUBENTITY, View<SUBENTITY>>) {
         this.name = name;
+        this.description = configuration.description;
         this.position = configuration.position;
         this.required = configuration.required;
         this.fieldType = fieldType;
         this.subView = configuration.subView;
-        this.isArray = fieldType.name === "Array";
+        this.isArray = fieldType?.name === "Array";
         this.meta = configuration.meta;
-        this.canUpdate = configuration.canUpdate;
-        this.canCreate = configuration.canCreate;
-        this.canInsert = configuration.canInsert;
-        this.canRemove = configuration.canRemove;
+        this.canUpdate = configuration.canUpdate ?? undefined;
+        this.canCreate = configuration.canCreate ?? undefined;
+        this.canInsert = configuration.canInsert ?? undefined;
+        this.canRemove = configuration.canRemove ?? undefined;
         this.default = configuration.default;
     }
 
@@ -38,6 +40,7 @@ export class ViewFieldDefinition<ENTITY extends DataObject<ENTITY>, SUBENTITY ex
         return {
             position: this.position,
             name: this.name,
+            description: this.description,
             required: this.required,
             subView: this.subView?.name,
             isArray: this.isArray,

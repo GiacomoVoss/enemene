@@ -13,5 +13,7 @@ export class AbstractUser extends DataObject<AbstractUser> {
     role: Role;
 
     roleId: uuid;
+
+    isPopulator?: boolean;
 }
 

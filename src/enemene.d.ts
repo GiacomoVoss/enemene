@@ -9,4 +9,6 @@ export * from "./types/filter";
 export * from "./types/log";
 export * from "./types/model";
 export * from "./types/util";
+export * from "./types/validation";
 export * from "./types/view";
+export * from "./types/populator";

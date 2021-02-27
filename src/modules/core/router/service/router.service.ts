@@ -9,7 +9,7 @@ import {RequestMethod} from "../enum/request-method.enum";
 import {RuntimeError} from "../../application/error/runtime.error";
 import {SecureRequest} from "../../auth/interface/secure-request.interface";
 import {PermissionService} from "../../auth/service/permission.service";
-import {DataFileService, Enemene, FileController} from "../../../..";
+import {AbstractUser, DataFileService, Enemene, FileController} from "../../../..";
 import {InputValidationError} from "../../validation/error/input-validation.error";
 import {Redirect} from "../class/redirect.class";
 import {ConstructorOf} from "../../../../base/constructor-of";
@@ -28,6 +28,9 @@ import multer from "multer";
 import {ValidationFieldError} from "../../validation/interface/validation-field-error.interface";
 import {HttpHeader} from "../decorator/parameter/header.decorator";
 import {Transaction} from "sequelize/types/lib/transaction";
+import {PopulatorController} from "../../dev/dev.controller";
+import path from "path";
+import {RequestContext} from "../interface/request-context.interface";
 
 export class RouterService {
 
@@ -43,7 +46,7 @@ export class RouterService {
     private multer;
 
     async init(): Promise<void> {
-        this.multer = multer({dest: Enemene.app.config.dataPath});
+        this.multer = multer({dest: path.join(process.cwd(), "tmpfiles")});
         const controllerFiles: string[] = this.fileService.scanForFilePattern(Enemene.app.config.modulesPath, /.*\.controller\.js/);
         const controllerModules: Dictionary<ConstructorOf<AbstractController>>[] = await Promise.all(controllerFiles.map((filePath: string) => import(filePath)));
         controllerModules.forEach((moduleMap: Dictionary<ConstructorOf<AbstractController>>) => {
@@ -54,7 +57,7 @@ export class RouterService {
             });
         });
 
-        [AuthController,
+        const systemControllers: ConstructorOf<AbstractController>[] = [AuthController,
             ActionController,
             FileController,
             ViewGetController,
@@ -62,7 +65,12 @@ export class RouterService {
             ViewPutController,
             ViewDeleteController,
             ModelController,
-        ].forEach((module: ConstructorOf<AbstractController>) => {
+        ];
+        if (Enemene.app.devMode) {
+            systemControllers.push(PopulatorController);
+        }
+
+        systemControllers.forEach((module: ConstructorOf<AbstractController>) => {
             (module.prototype.$paths || []).forEach((pathDefinition: PathDefinition) => {
                 this.register(module, pathDefinition);
             });
@@ -157,7 +165,7 @@ export class RouterService {
      */
     public async logError(err: RuntimeError, req: SecureRequest, res: Response, next: Function) {
 
-        if (err.name === "SequelizeForeignKeyConstraintError") {
+        if (["SequelizeUniqueConstraintError", "SequelizeForeignKeyConstraintError"].includes(err.name)) {
             err = new IntegrityViolationError();
         }
 
@@ -190,9 +198,7 @@ export class RouterService {
 
         try {
             const result: any | Redirect | CustomResponse<any> = await pathDefinition.fn.apply(this.controllers[pathDefinition.controller.name], parameterValues);
-            if (transaction) {
-                await transaction.commit();
-            }
+            await transaction?.commit();
             if (result instanceof Redirect) {
                 res.redirect(result.url);
             } else if (result instanceof CustomResponse) {
@@ -208,12 +214,12 @@ export class RouterService {
                 res.send(result);
             }
         } catch (e) {
-            await transaction.rollback();
+            await transaction?.rollback();
             throw e;
         }
     }
 
-    private resolveParameter(req: SecureRequest, res: Response, param: string[], transaction: Transaction): any {
+    private resolveParameter(req: SecureRequest, res: Response, param: string[], transaction?: Transaction): any {
         const [paramType, value] = param;
         let context: Dictionary<string>;
         let parameterValue: any = undefined;
@@ -246,7 +252,7 @@ export class RouterService {
                     currentUser: req.payload,
                     language: req.header(HttpHeader.LANGUAGE),
                     transaction,
-                };
+                } as RequestContext<AbstractUser>;
                 break;
             case ParameterType.HEADER:
                 parameterValue = req.header(value);

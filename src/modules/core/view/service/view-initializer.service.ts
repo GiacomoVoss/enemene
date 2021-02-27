@@ -25,7 +25,21 @@ export class ViewInitializerService {
         const viewFiles: string[] = this.fileService.scanForFilePattern(Enemene.app.config.modulesPath, /.*\.view\.js/);
         await Promise.all(viewFiles.map((filePath: string) => import(filePath)));
         Object.entries(Enemene.app.db.models).forEach(([entity, model]) => {
-
+            ViewInitializerService.SELECTION_VIEW_DEFINITIONS[entity] = new ViewDefinition<any>(
+                UuidService.getUuid(),
+                () => model,
+                class SelectionView extends View<any> {
+                    public $view: any = {
+                        entity: model,
+                    };
+                },
+                ModelService.getDisplayPatternFields(entity)
+                    .map((entityField: EntityField, position: number) => new ViewFieldDefinition(entityField.name as any, {name: "String"}, {
+                        position,
+                    })),
+            );
+        });
+        Object.entries(ModelService.VIRTUAL_MODELS).forEach(([entity, model]) => {
             ViewInitializerService.SELECTION_VIEW_DEFINITIONS[entity] = new ViewDefinition<any>(
                 UuidService.getUuid(),
                 () => model,
@@ -42,8 +56,8 @@ export class ViewInitializerService {
         });
     }
 
-    public getAllViews(): string[] {
-        return Object.keys(ViewInitializerService.VIEWS);
+    public getAllViews(): Dictionary<ConstructorOf<View<any>>> {
+        return ViewInitializerService.VIEWS;
     }
 
     /**
@@ -55,17 +69,20 @@ export class ViewInitializerService {
         if (this.VIEWS[viewClass.name]) {
             throw new Error(`Duplicate view ${chalk.bold(viewClass.name)}`);
         }
-        Enemene.log.debug(this.constructor.name, `Registering view ${chalk.bold(viewClass.name)} (${viewClass.prototype.$view.id}).`);
-        this.validate(viewClass);
-        this.VIEWS[viewClass.name] = viewClass;
+        Enemene.log.debug(this.name, `Registering view ${chalk.bold(viewClass.name)} (${viewClass.prototype.$view.id}).`);
+        // this.validate(viewClass);
         this.VIEWS[viewClass.prototype.$view.id] = viewClass;
     }
 
-    public static getViewDefinition(viewName: string): ViewDefinition<any> {
-        let viewClass = this.VIEWS[viewName];
+    public static getViewDefinition(viewId: string): ViewDefinition<any> {
+        let viewClass = this.VIEWS[viewId];
 
         if (!viewClass) {
-            throw new ObjectNotFoundError(viewName);
+            viewClass = Object.values(this.VIEWS).find(view => view.name === viewId);
+        }
+
+        if (!viewClass) {
+            throw new ObjectNotFoundError(viewId);
         }
 
         return viewClass.prototype.$view;

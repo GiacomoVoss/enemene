@@ -87,7 +87,7 @@ export declare class ActionStepResultSelection<VIEW extends View<any>> extends A
  * Return an ActionStepResultSuccess to signal the succession of the action.
  */
 export declare class ActionStepResultSuccess extends ActionStepResult {
-    constructor();
+    constructor(message?: string | string[]);
 }
 
 /**

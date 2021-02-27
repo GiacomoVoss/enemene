@@ -5,11 +5,10 @@ import {CollectionField} from "../interface/collection-field.class";
 
 export function Collection(label: string | string[],
                            classGetter: () => any,
-                           foreignKey: string,
                            mappedBy?: string): Function {
     return function (target, propertyKey): void {
         const fields: Dictionary<EntityField> = ModelService.MODEL[target.constructor.name] || {};
-        fields[propertyKey] = new CollectionField(propertyKey, label, classGetter, foreignKey, mappedBy);
+        fields[propertyKey] = new CollectionField(propertyKey, label, classGetter, mappedBy);
         ModelService.MODEL[target.constructor.name] = fields;
     };
 }

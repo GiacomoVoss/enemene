@@ -1,4 +1,4 @@
-import {DataObject} from "./model";
+import {DataObject, VirtualObject} from "./model";
 import {ConstructorOf, uuid} from "./base";
 import {RequestContext} from "./controller";
 import {AbstractUser} from "./auth";
@@ -17,7 +17,7 @@ export {Order} from "sequelize";
 export declare abstract class View<ENTITY extends DataObject<ENTITY>> {
     public id: uuid;
 
-    public setValues(data: Dictionary<serializable>, context: RequestContext<AbstractUser>): void;
+    public setValues(data: Dictionary<serializable>, context?: RequestContext<AbstractUser>): void;
 
     toJSON(): object;
 }
@@ -90,6 +90,11 @@ export interface ViewFieldConfiguration<SUBENTITY extends DataObject<SUBENTITY>,
     position: number;
 
     /**
+     * The help description of the field.
+     */
+    description?: string | string[];
+
+    /**
      * A flag determining if the value of this view field can be updated. Overwrites the permissions specified in {@link ViewPermission#permissions}.
      */
     canUpdate?: boolean;
@@ -113,7 +118,7 @@ export interface ViewFieldConfiguration<SUBENTITY extends DataObject<SUBENTITY>,
      * A function to generate a default value.
      * @param context {RequestContext<AbstractUser>} The context of the current request.
      */
-    default?(context: RequestContext<AbstractUser>): any,
+    default?(context?: RequestContext<AbstractUser>): any,
 
     /**
      * A flag determining if the field is required when updating/creating an object.
@@ -129,6 +134,22 @@ export interface ViewFieldConfiguration<SUBENTITY extends DataObject<SUBENTITY>,
      * Any additional meta information that will not be interpreted by the framework.
      */
     meta?: any;
+}
+
+export class ViewFieldDefinition<ENTITY extends DataObject<ENTITY>, SUBENTITY extends DataObject<SUBENTITY>> {
+    public name: keyof View<ENTITY>;
+    public description?: string | string[];
+    public position: number;
+    public required: boolean;
+    public fieldType?: any;
+    public subView?: ConstructorOf<View<SUBENTITY>>;
+    public isArray: boolean;
+    public default: (context?: RequestContext<AbstractUser>) => any;
+    private meta?: any;
+
+    constructor(name: keyof View<ENTITY>, fieldType: any, configuration: ViewFieldConfiguration<SUBENTITY, View<SUBENTITY>>);
+
+    public toJSON();
 }
 
 /**
@@ -193,5 +214,10 @@ export interface ViewFindOptions {
     searchString?: string;
 }
 
+export declare class ViewObject extends VirtualObject<ViewObject> {
+    id: uuid;
 
+    name: string;
 
+    protected getObjects(): ViewObject[];
+}

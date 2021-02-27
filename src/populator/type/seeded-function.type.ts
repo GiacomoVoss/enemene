@@ -1,0 +1,1 @@
+export type SeededFunction<T> = (seed: string) => T;

@@ -6,6 +6,7 @@ import {createView} from "./create-view";
 import {createEntity} from "./create-entity";
 import Handlebars from "handlebars";
 import {fieldAnnotationHelper, isPluralFieldHelper, typescriptTypeForEntityFieldType} from "./utils/helpers";
+import {populate} from "./populate";
 
 async function run() {
 
@@ -22,8 +23,11 @@ async function run() {
         case "mentity":
             await createEntity();
             break;
+        case "mopulator":
+            await populate();
+            break;
         default:
-            console.log(chalk.red(`Invalid argument. Provide one of the following: ${chalk.bold("miew, mentity")}`));
+            console.log(chalk.red(`Invalid argument. Provide one of the following: ${chalk.bold("miew, mentity", "mopulator")}`));
             process.exit(1);
             break;
     }

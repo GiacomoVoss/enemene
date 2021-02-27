@@ -16,7 +16,7 @@ export class DataObject<E> extends Model {
         super(values, options);
     }
 
-    toJSON(): any {
+    public toJSON(): any {
         return {
             ...super.toJSON(),
             $displayPattern: this.$displayPattern,

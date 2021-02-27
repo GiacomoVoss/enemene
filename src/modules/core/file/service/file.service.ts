@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import mkdirp from "mkdirp";
 
 export class FileService {
 
@@ -10,9 +11,12 @@ export class FileService {
      * @param from      Source path.
      * @param to        Destination path.
      */
-    public copyFile(from: string, to: string) {
-        let source = fs.createReadStream(from);
-        let dest = fs.createWriteStream(to);
+    public async copyFile(from: string, to: string): Promise<void> {
+        const source = fs.createReadStream(from);
+        if (!fs.existsSync(path.dirname(to))) {
+            await mkdirp(path.dirname(to));
+        }
+        const dest = fs.createWriteStream(to);
 
         return new Promise((resolve, reject) => {
             source.on("end", resolve);

@@ -24,7 +24,7 @@ export default class ViewPutController extends AbstractViewController {
 
         return {
             data: await this.viewService.save(view, context),
-            model: viewDefinition.getModel(),
+            model: viewDefinition.getModel(context),
         };
     }
 
@@ -56,11 +56,11 @@ export default class ViewPutController extends AbstractViewController {
             }, context);
         }
 
-        await this.viewService.save(object, context);
+        await this.viewService.save(rootObject, context);
 
         return {
             data: (await this.viewService.findById(viewDefinition.viewClass, objectId, context)).getByPath(attributePath),
-            model: viewDefinition.getModel(),
+            model: viewDefinition.getModel(context),
         };
     }
 

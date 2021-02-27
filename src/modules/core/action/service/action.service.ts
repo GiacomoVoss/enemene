@@ -17,6 +17,7 @@ import {ParameterType} from "../../router/enum/parameter-type.enum";
 import {UnsupportedOperationError} from "../../error/unsupported-operation.error";
 import {ViewFindService} from "../../view/service/view-find.service";
 import {ViewHelperService} from "../../view/service/view-helper.service";
+import {I18nService} from "../../i18n/service/i18n.service";
 
 /**
  * Service for handling views for data manipulation.
@@ -81,20 +82,20 @@ export class ActionService {
     public async validateActionInput<ENTITY extends DataObject<ENTITY>>(step: ActionParameterConfiguration, stepResult: ActionStepResult, input: serializable, context: RequestContext<AbstractUser>, actionName: string): Promise<any> {
         if (stepResult instanceof ActionStepResultForm) {
             if (input === undefined) {
-                throw new InputValidationError([new ActionInputValidationError(step.label)], actionName, context.language);
+                throw new InputValidationError([new ActionInputValidationError(I18nService.getI18nizedString(step.label, context.language))], actionName, context.language);
             }
             return this.viewHelperService.wrap(input as DataObject<ENTITY>, stepResult.view.prototype.$view);
         } else if (stepResult instanceof ActionStepResultSelection) {
             if (!Array.isArray(input)) {
-                throw new InputValidationError([new ActionInputValidationError(step.label)], actionName, context.language);
+                throw new InputValidationError([new ActionInputValidationError(I18nService.getI18nizedString(step.label, context.language))], actionName, context.language);
             }
             const selectedIds: uuid[] = input as uuid[];
             const objects: View<any>[] = await this.viewFindService.findAll(stepResult.view, context, Filter.in("id", selectedIds));
             if (stepResult.singleSelection && objects.length > 1) {
-                throw new InputValidationError([new ActionInputValidationError(step.label)], actionName, context.language);
+                throw new InputValidationError([new ActionInputValidationError(I18nService.getI18nizedString(step.label, context.language))], actionName, context.language);
             }
             if (stepResult.required && objects.length === 0) {
-                throw new InputValidationError([new ActionInputValidationError(step.label)], actionName, context.language);
+                throw new InputValidationError([new ActionInputValidationError(I18nService.getI18nizedString(step.label, context.language))], actionName, context.language);
             }
             return objects;
         } else {

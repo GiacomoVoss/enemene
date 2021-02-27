@@ -160,6 +160,11 @@ export declare interface EnemeneConfig {
     developerRoleId?: uuid;
 
     /**
+     * The ID of an anonymous role which will be assigned automatically to all non-authenticated requests.
+     */
+    anonymousRoleId?: uuid;
+
+    /**
      * This can contain 2 possible values:
      * 1. a url starting with http/https to a running server, which will be proxied through the enemene server.
      * 2. a file path to the folder where the static frontend files and an index.html file live.

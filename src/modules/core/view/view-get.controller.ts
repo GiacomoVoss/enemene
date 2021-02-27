@@ -17,11 +17,14 @@ import {Controller} from "../router/decorator/controller.decorator";
 import {ViewDefinition} from "./class/view-definition.class";
 import {get, set} from "lodash";
 import {InvalidAttributePathError} from "./error/invalid-attribute-path.error";
-import {AbstractFilter, FilterService} from "../filter";
+import {AbstractFilter} from "../filter";
+import {Enemene} from "../application";
 
 
 @Controller("view")
 export default class ViewGetController extends AbstractViewController {
+
+    private dataService: DataService = Enemene.app.inject(DataService);
 
     private dotize(jsonobj: any, prefix?: string) {
         var newobj = {};
@@ -132,7 +135,7 @@ export default class ViewGetController extends AbstractViewController {
         const data: View<ENTITY>[] = await this.viewService.findAll(viewDefinition.viewClass, context, undefined, this.viewHelperService.parseFindOptions(order, limit, offset, searchString));
         return {
             data: data.map((object: View<ENTITY>) => this.filterFields(object, requestedFields)),
-            model: viewDefinition.getModel(language),
+            model: viewDefinition.getModel(context),
             actions: viewDefinition.getActionConfigurations(),
         };
     }
@@ -145,7 +148,7 @@ export default class ViewGetController extends AbstractViewController {
         const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
         return {
             data: this.filterFields(await this.viewService.findById(viewDefinition.viewClass, objectId, context), requestedFields) as Dictionary<any, keyof ENTITY>,
-            model: viewDefinition.getModel(),
+            model: viewDefinition.getModel(context),
             actions: viewDefinition.getActionConfigurations(),
         };
     }
@@ -167,7 +170,7 @@ export default class ViewGetController extends AbstractViewController {
 
         return {
             data: view.getByPath(attributePath),
-            model: viewDefinition.getModel(undefined, attributePath),
+            model: viewDefinition.getModel(context, attributePath),
         };
     }
 
@@ -175,7 +178,7 @@ export default class ViewGetController extends AbstractViewController {
     async getViewModel(@Context context: RequestContext<AbstractUser>,
                        @Path("view") viewName: string): Promise<Dictionary<serializable>> {
         const viewDefinition: ViewDefinition<any> = this.getViewDefinition(viewName);
-        return viewDefinition.getModel();
+        return viewDefinition.getModel(context);
     }
 
     @Get("/model/:view/*", true)
@@ -183,38 +186,36 @@ export default class ViewGetController extends AbstractViewController {
                              @Req request: SecureRequest,
                              @Path("view") viewName: string): Promise<Dictionary<serializable>> {
         const viewDefinition: ViewDefinition<any> = this.getViewDefinition(viewName);
-        return viewDefinition.getModel(context.language, request.params[0]);
+        return viewDefinition.getModel(context, request.params[0]);
     }
 
     @Get("/allowedValues/:view/:attribute", true)
     async getAllowedValues<ENTITY extends DataObject<ENTITY>, SUBENTITY extends DataObject<SUBENTITY>>(@Path("view") viewName: string,
-                                                                                                       @Path("attribute") collectionField: keyof ENTITY,
+                                                                                                       @Path("attribute") attribute: keyof ENTITY,
                                                                                                        @Context context: RequestContext<AbstractUser>): Promise<DataResponse<any>> {
 
         const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
 
-        const collectionViewField: ViewFieldDefinition<ENTITY, SUBENTITY> | undefined = viewDefinition.fields
-            .find((field: ViewFieldDefinition<ENTITY, SUBENTITY>) => field.name === collectionField);
+        const viewField: ViewFieldDefinition<ENTITY, SUBENTITY> | undefined = viewDefinition.fields
+            .find((field: ViewFieldDefinition<ENTITY, SUBENTITY>) => field.name === attribute);
 
-        if (!collectionViewField) {
+        if (!viewField) {
             throw new ObjectNotFoundError();
         }
 
-        const entityField: ReferenceField = ModelService.getFields(viewDefinition.entity.name)[collectionField as string];
+        const entityField: ReferenceField = ModelService.getFields(viewDefinition.entity.name)[attribute as string];
 
         if (!(entityField instanceof ReferenceField)) {
             throw new UnsupportedOperationError("Cannot get allowed values.");
         }
 
-        const allowedValuesFilter: AbstractFilter = ModelService.getAllowedValuesFilter(viewDefinition.entity, collectionViewField.name as keyof ENTITY, context);
+        const allowedValuesFilter: AbstractFilter = ModelService.getAllowedValuesFilter(viewDefinition.entity, viewField.name as keyof ENTITY, context);
         const subViewDefinition: ViewDefinition<SUBENTITY> = ViewInitializerService.getSelectionViewDefinition(entityField.classGetter());
         // const data: View<SUBENTITY>[] = await this.viewService.findAll(subViewDefinition.viewClass, new UnrestrictedRequestContext(), allowedValuesFilter);
-        const data: DataObject<ENTITY>[] = await DataService.findAllRaw(subViewDefinition.entity, {
-            ...FilterService.toSequelize(allowedValuesFilter, subViewDefinition.entity),
-        });
+        const data: DataObject<ENTITY>[] = await this.dataService.findAll(subViewDefinition.entity, allowedValuesFilter);
         return {
             data: data.map(d => this.viewHelperService.wrap(d, subViewDefinition)),
-            model: viewDefinition.getModel(context.language),
+            model: viewDefinition.getModel(context),
         };
     }
 }

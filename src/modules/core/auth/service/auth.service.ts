@@ -1,5 +1,6 @@
 import * as jwt from "jsonwebtoken";
 import {AbstractUser} from "..";
+import {Enemene} from "../../application";
 
 const fs = require("fs");
 
@@ -31,7 +32,7 @@ export class AuthService {
         }
     }
 
-    public static createToken(user: AbstractUser): string {
+    public static createToken(user: AbstractUser, populator: boolean = false): string {
         if (!AuthService.PUBLIC_KEY) {
             return undefined;
         }
@@ -44,6 +45,10 @@ export class AuthService {
 
         for (const additionalField of this.INCLUDE_IN_TOKEN) {
             payload[additionalField] = user[additionalField];
+        }
+
+        if (Enemene.app.devMode && populator) {
+            payload.isPopulator = true;
         }
 
         return jwt.sign(payload, AuthService.PRIVATE_KEY, {

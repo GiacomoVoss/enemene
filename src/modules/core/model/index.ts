@@ -1,5 +1,6 @@
 export * from "./decorator/allowed-values.decorator";
 export * from "./data-object.model";
+export * from "./class/virtual-object.model";
 export * from "./enum/entity-field-type.enum";
 export * from "./decorator/calculated.decorator";
 export * from "./decorator/collection.decorator";

@@ -47,6 +47,7 @@
     "mysql2": "^2.1.0",
     "natives": "^1.1.6",
     "reflect-metadata": "^0.1.13",
+    "seedrandom": "^3.0.5",
     "sequelize": "^6.4.0",
     "ts-loader": "^7.0.5",
     "typescript": "^3.9.5",

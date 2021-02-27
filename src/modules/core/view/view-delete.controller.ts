@@ -12,7 +12,7 @@ import {Dictionary} from "../../../base/type/dictionary.type";
 import {serializable} from "../../../base/type/serializable.type";
 import {View} from "./class/view.class";
 import {InvalidAttributePathError} from "./error/invalid-attribute-path.error";
-import {ViewFieldDefinition} from "./interface/view-field-definition.interface";
+import {ViewFieldDefinition} from "./class/view-field-definition.class";
 import {Enemene} from "../application";
 
 @Controller("view")

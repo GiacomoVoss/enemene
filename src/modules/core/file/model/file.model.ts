@@ -1,17 +1,23 @@
 import {DataObject, Entity, EntityFieldType, Field} from "../../model";
+import {uuid} from "../../../../base/type/uuid.type";
 
 @Entity
 export class File extends DataObject<File> {
 
-    @Field("Name", EntityFieldType.STRING, true)
-    name: string;
+    $displayPattern = "{originalName}";
 
     @Field("Original name", EntityFieldType.STRING, true)
     originalName: string;
 
     @Field("File size", EntityFieldType.INTEGER, true)
     size: number;
-    //
-    // @Reference("Uploader", () => Enemene.app.config.userModel)
-    // uploadedBy: uuid;
+
+    @Field("Uploader id", EntityFieldType.STRING)
+    uploadedById: uuid;
+
+    @Field("Temporary", EntityFieldType.BOOLEAN, true, {
+        defaultValue: true,
+    })
+    temporary: boolean;
+
 }

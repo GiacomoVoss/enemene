@@ -20,7 +20,7 @@ export class RoutePermission extends DataObject<RoutePermission> implements Afte
     @Field("Request-Methode", EntityFieldType.STRING, true)
     method: RequestMethod;
 
-    @Reference("Rolle", () => Role, true)
+    @Reference("Rolle", () => Role, false)
     role: Role;
 
     roleId: string;

@@ -11,7 +11,17 @@ export default class AuthController extends AbstractController {
 
     @Post("login", true)
     async login(@Body("username") username: string,
-                @Body("password") password: string): Promise<string> {
+                @Body("password") password: string,
+                @Body("populator") populator: boolean): Promise<string> {
+
+        if (Enemene.app.devMode && populator) {
+            return AuthService.createToken(Enemene.app.config.userModel.build({
+                id: "5831500b-9ad0-4c82-b425-6373b0cc6f8f",
+                username: "populator",
+                roleId: "populator"
+            }), true);
+        }
+
         if (!username || !password) {
             throw new UnauthorizedError();
         }

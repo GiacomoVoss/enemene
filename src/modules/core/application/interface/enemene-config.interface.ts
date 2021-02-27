@@ -78,7 +78,15 @@ export interface EnemeneConfig {
 
     languages?: string[];
 
+    /**
+     * The ID of a developer role which automatically gets permission to all views, controllers and actions.
+     */
     developerRoleId?: uuid;
+
+    /**
+     * The ID of an anonymous role which will be assigned automatically to all non-authenticated requests.
+     */
+    anonymousRoleId?: uuid;
 
     /**
      * This can contain 2 possible values:

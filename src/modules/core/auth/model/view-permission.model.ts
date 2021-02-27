@@ -7,20 +7,23 @@ import {Reference} from "../../model/decorator/reference.decorator";
 import {EntityFieldType} from "../../model/enum/entity-field-type.enum";
 import {PermissionService} from "../service/permission.service";
 import {AfterCreateHook} from "../../data";
-import {Enemene} from "../../../..";
+import {Enemene, ViewObject} from "../../../..";
+import {uuid} from "../../../../base/type/uuid.type";
 
 @Entity
 export class ViewPermission extends DataObject<ViewPermission> implements AfterCreateHook {
 
     $displayPattern = "{view} ({permissions})";
 
-    @Field("View", EntityFieldType.STRING, true)
-    view: string;
+    @Reference("View", () => ViewObject, true)
+    view: ViewObject;
+
+    viewId: uuid;
 
     @Field("Permissions", EntityFieldType.STRING, true)
     permissions: string;
 
-    @Reference("Role", () => Role, false)
+    @Reference("Role", () => Role, true)
     role: Role;
 
     roleId: string;

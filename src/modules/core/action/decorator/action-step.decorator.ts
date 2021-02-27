@@ -1,6 +1,6 @@
 import {Dictionary} from "../../../../base/type/dictionary.type";
 
-export function ActionStep(index: number, label: string) {
+export function ActionStep(index: number, label: string | string[]) {
     return function (target: any, propertyKey: string, descriptor: PropertyDescriptor): void {
         const steps: Dictionary<any> = target.constructor.prototype.$steps || {};
 

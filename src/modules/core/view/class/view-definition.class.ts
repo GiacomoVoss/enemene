@@ -1,5 +1,5 @@
 import {DataObject} from "../../model";
-import {ViewFieldDefinition} from "../interface/view-field-definition.interface";
+import {ViewFieldDefinition} from "../class/view-field-definition.class";
 import {ConstructorOf} from "../../../../base/constructor-of";
 import {View} from "..";
 import {AbstractFilter} from "../../filter";
@@ -9,13 +9,9 @@ import {Order} from "sequelize";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {serializable} from "../../../../base/type/serializable.type";
 import {ModelService} from "../../model/service/model.service";
-import {isEqual} from "lodash";
 import {I18nService} from "../../i18n/service/i18n.service";
 import {EntityField} from "../../model/interface/entity-field.class";
-import {ReferenceField} from "../../model/interface/reference-field.class";
-import {CollectionField} from "../../model/interface/collection-field.class";
-import {ManyToManyField} from "../../model/interface/many-to-many-field.class";
-import {AbstractUser, UuidService} from "../../../..";
+import {AbstractUser, Enemene, UuidService} from "../../../..";
 import {RequestContext} from "../../router/interface/request-context.interface";
 import {ViewDefinitionConfiguration} from "../interface/view-definition-configuration.interface";
 import {ActionDefinition} from "../../action/interface/action-definition.interface";
@@ -60,14 +56,9 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
         this.searchAttributes = configuration?.searchAttributes;
         this.meta = configuration?.meta;
 
-        this.fields = fields.map(viewField => {
-            viewField.canInsert = viewField.isArray ? viewField.canInsert : false;
-            viewField.canRemove = viewField.isArray ? viewField.canRemove : false;
+        this.fields = fields ?? [];
 
-            return viewField;
-        });
-
-        const requiredFields: AbstractValidate[] = fields
+        const requiredFields: AbstractValidate[] = this.fields
             .filter((field: ViewFieldDefinition<ENTITY, any>) => field.required)
             .map((field: ViewFieldDefinition<ENTITY, any>) => field.name)
             .map(Validate.exists);
@@ -81,7 +72,7 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
         }
     }
 
-    public getModel(language?: string, path?: string): Dictionary<serializable, uuid> {
+    public getModel(context: RequestContext<AbstractUser>, path?: string, parentFieldPermissions?: Dictionary<boolean>): Dictionary<serializable, uuid> {
         if (path) {
             const pathTokens: string[] = path.split("/");
             let token: string = pathTokens.shift();
@@ -90,7 +81,7 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
             }
             let subField = this.fields.find((field: ViewFieldDefinition<ENTITY, any>) => field.name === token);
             if (subField.subView) {
-                return new subField.subView().$view.getModel(language, pathTokens.join("/"));
+                return new subField.subView().$view.getModel(context, pathTokens.join("/"), Enemene.app.inject(PermissionService).getViewFieldPermissions(this, subField, context));
             }
         }
 
@@ -98,10 +89,20 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
         const fields: ViewFieldDefinition<ENTITY, any>[] = [...this.fields];
         fields.sort((a: ViewFieldDefinition<ENTITY, any>, b: ViewFieldDefinition<ENTITY, any>) => a.position - b.position);
 
+        const fieldPermissions: Dictionary<Dictionary<boolean>> = fields.reduce((result: Dictionary<Dictionary<boolean>>, field: ViewFieldDefinition<ENTITY, any>) => {
+            result[field.name] = Enemene.app.inject(PermissionService).getViewFieldPermissions(this, field, context);
+            return result;
+        }, {});
+
         const myParsedModel: Dictionary<serializable> = {
-            ...PermissionService.addViewPermissions(I18nService.parseEntityModel(myModel, language), this),
+            ...I18nService.parseEntityModel(myModel, context.language),
             $fields: fields.map(f => f.name),
         };
+        Object.entries(myParsedModel).forEach(([key, field]) => {
+            if (key !== "$fields") {
+                Object.assign(field, parentFieldPermissions, fieldPermissions[key]);
+            }
+        });
 
         let fullModel: ViewModel = {
             $root: this.id,
@@ -114,7 +115,7 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
             .filter(f => f.subView)
             .reduce((m: ViewModel, field: ViewFieldDefinition<ENTITY, any>) => {
                 const subView: ViewDefinition<any> = field.subView.prototype.$view;
-                const subViewModel: Dictionary<serializable, uuid> = subView.getModel(language);
+                const subViewModel: Dictionary<serializable, uuid> = subView.getModel(context, undefined, fieldPermissions[field.name]);
                 m[this.id][field.name].view = subView.id;
                 m[subView.id] = {
                     ...(subViewModel[subView.id] as Dictionary<serializable>),
@@ -124,53 +125,6 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
             }, fullModel);
 
         return fullModel;
-    }
-
-
-    public getFields(requestedFields?: string[]): string[] {
-        let fields: string[] = [];
-
-        // Get all possible fields from view.
-        for (const viewField of this.fields) {
-            const fieldName: string = viewField.name as string;
-
-            const entityField: EntityField = ModelService.getFields(this.entity.name)[fieldName];
-            if (entityField) {
-                fields.push(entityField.name);
-                if (!entityField.isSimpleField) {
-                    if (viewField.subView) {
-                        const subView: ViewDefinition<any> = viewField.subView.prototype.$view;
-                        fields.push(...subView.getFields().map(field => `${fieldName}.${field}`));
-                    } else {
-                        fields.push(...ModelService.getDisplayPatternFields((entityField as ReferenceField).classGetter().name).map((field => `${fieldName}.${field.name}`)));
-                    }
-                }
-
-                if (entityField instanceof CollectionField || entityField instanceof ManyToManyField) {
-                    fields.push(`${fieldName}.$count`);
-                }
-            }
-        }
-
-        if (requestedFields && !isEqual(requestedFields, ["*"])) {
-            return fields.filter((field: string) => {
-                if (field === "id" || field.endsWith(".id")) {
-                    return true;
-                }
-
-                if (requestedFields.includes(field)) {
-                    return true;
-                }
-                const baseField: string = field.substr(0, field.indexOf("."));
-                if (requestedFields.includes(baseField) || requestedFields.includes(`${baseField}.*`) || requestedFields.find((f: string) => f.startsWith(`${baseField}`))) {
-                    return true;
-                }
-
-                return false;
-            });
-        }
-
-        return fields;
     }
 
     public getActionConfigurations(): ActionDefinition[] {

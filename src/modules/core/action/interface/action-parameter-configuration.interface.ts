@@ -1,5 +1,5 @@
 export interface ActionParameterConfiguration {
-    label: string;
+    label: string | string[];
 
     index: number;
 

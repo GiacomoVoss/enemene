@@ -9,5 +9,5 @@ export interface RequestContext<USER extends AbstractUser> {
 
     currentUser?: USER;
 
-    transaction: Transaction;
+    transaction?: Transaction;
 }

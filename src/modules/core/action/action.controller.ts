@@ -3,7 +3,7 @@ import {AbstractAction} from "./class/abstract-action.class";
 import {ActionService} from "./service/action.service";
 import {ViewInitializerService} from "../view";
 import {AbstractController} from "../router/class/abstract-controller.class";
-import {AbstractUser, DataObject, DataService, Enemene} from "../../..";
+import {AbstractUser, ActionStepResultSuccess, DataObject, DataService, Enemene} from "../../..";
 import {ActionStepResult} from "./class/action-step-result.class";
 import {ActionResultStatus} from "./enum/action-result-status.enum";
 import {ActionStepResultForm} from "./class/action-step-result-form.class";
@@ -18,6 +18,7 @@ import {PermissionService} from "../auth/service/permission.service";
 import {Controller} from "../router/decorator/controller.decorator";
 import {ViewDefinition} from "../view/class/view-definition.class";
 import {ViewHelperService} from "../view/service/view-helper.service";
+import {I18nService} from "../i18n/service/i18n.service";
 
 @Controller("action")
 export default class ActionController extends AbstractController {
@@ -40,22 +41,27 @@ export default class ActionController extends AbstractController {
         let lastResult: ActionStepResult;
         let currentStep: ActionParameterConfiguration;
         const validatedInputs: any[] = [];
-        for (const step of action.getSteps()) {
-            const parameters: [ActionParameterType, number?][] = action.getParameters(step.value.name) ?? [];
-            const parameterValues: any[] = await Promise.all(parameters.map((param: [ActionParameterType, number?]) => this.actionService.resolveParameter(step, param, origin, validatedInputs, context)));
-            lastResult = await step.value.apply(action, parameterValues);
-            currentStep = step;
+        try {
+            for (const step of action.getSteps()) {
+                const parameters: [ActionParameterType, number?][] = action.getParameters(step.value.name) ?? [];
+                const parameterValues: any[] = await Promise.all(parameters.map((param: [ActionParameterType, number?]) => this.actionService.resolveParameter(step, param, origin, validatedInputs, context)));
+                lastResult = await step.value.apply(action, parameterValues);
+                currentStep = step;
 
-            if (inputs[step.index]) {
-                validatedInputs.push(await this.actionService.validateActionInput(step, lastResult, inputs[step.index], context, actionName));
-            } else {
-                break;
+                if (inputs[step.index]) {
+                    validatedInputs.push(await this.actionService.validateActionInput(step, lastResult, inputs[step.index], context, actionName));
+                } else {
+                    break;
+                }
             }
+        } catch (e) {
+            throw e;
         }
 
         if (lastResult.status === ActionResultStatus.SUCCESS) {
             return this.responseWithStatus(200, {
                 type: lastResult.status,
+                label: I18nService.getI18nizedString((lastResult as ActionStepResultSuccess).message, context.language),
             });
         }
 
@@ -65,10 +71,10 @@ export default class ActionController extends AbstractController {
             return this.responseWithStatus(202, {
                 data: {
                     data: formResult.object ?? {},
-                    model: viewDefinition.getModel(),
+                    model: viewDefinition.getModel(context),
                 },
                 type: lastResult.status,
-                label: currentStep.label,
+                label: I18nService.getI18nizedString(currentStep.label, context.language),
             });
         }
 
@@ -79,10 +85,10 @@ export default class ActionController extends AbstractController {
             return this.responseWithStatus(202, {
                 data: {
                     data: data.map((object: DataObject<any>) => this.viewHelperService.wrap(object, viewDefinition)),
-                    model: viewDefinition.getModel(),
+                    model: viewDefinition.getModel(context),
                 },
                 type: lastResult.status,
-                label: currentStep.label,
+                label: I18nService.getI18nizedString(currentStep.label, context.language),
                 configuration: {
                     preselection: selectionResult.preselection,
                     singleSelection: selectionResult.singleSelection,

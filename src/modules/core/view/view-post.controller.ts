@@ -25,7 +25,7 @@ export default class ViewPostController extends AbstractViewController {
 
         return {
             data: savedData,
-            model: viewDefinition.getModel(),
+            model: viewDefinition.getModel(context),
         };
     }
 
@@ -42,7 +42,7 @@ export default class ViewPostController extends AbstractViewController {
 
         return {
             data: savedData,
-            model: viewDefinition.getModel(),
+            model: viewDefinition.getModel(context),
         };
     }
 
@@ -102,7 +102,7 @@ export default class ViewPostController extends AbstractViewController {
         const rootObject = await this.viewService.save(object, context);
         return {
             data: rootObject.getByPath(`${attributePath}/${newSubView.id}`),
-            model: viewDefinition.getModel(),
+            model: viewDefinition.getModel(context),
         };
     }
 }

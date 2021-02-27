@@ -1,5 +1,5 @@
 import {BuildOptions, FindOptions, Model, ModelAttributeColumnOptions, Order} from "sequelize";
-import {ConstructorOf, Dictionary, serializable} from "./base";
+import {ConstructorOf, Dictionary, serializable, uuid} from "./base";
 import {AbstractFilter} from "./filter";
 import {RequestContext} from "./controller";
 import {AbstractUser} from "./auth";
@@ -26,7 +26,6 @@ export declare function Calculated(label: string | string[],
 
 export declare function Collection(label: string | string[],
                                    classGetter: () => ConstructorOf<DataObject<any>>,
-                                   foreignKey: string,
                                    mappedBy?: string): Function;
 
 export function Composition(label: string | string[],
@@ -87,3 +86,9 @@ export interface DataFindOptions {
     limit?: number;
 }
 
+export declare abstract class VirtualObject<E> extends DataObject<E> {
+
+    abstract id: uuid;
+
+    protected abstract getObjects(): E[];
+}

@@ -4,7 +4,7 @@ import {View} from "../class/view.class";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {EntityField} from "../../model/interface/entity-field.class";
 import {ModelService} from "../../model/service/model.service";
-import {ViewFieldDefinition} from "../interface/view-field-definition.interface";
+import {ViewFieldDefinition} from "../class/view-field-definition.class";
 import {ReferenceField} from "../../model/interface/reference-field.class";
 import {RequestContext} from "../../router/interface/request-context.interface";
 import {AbstractUser} from "../../auth";
@@ -178,18 +178,23 @@ export class ViewHelperService {
                     }));
                 this.addIncludeAndAttributes(entity, includes, findOptions);
             } else {
-                const include: IncludeOptions = {model: (entityField as ReferenceField).classGetter(), as: fieldName, required: false};
-                if (field.subView) {
-                    const viewDefinition: ViewDefinition<any> = field.subView.prototype.$view;
-                    this.addIncludeAndAttributes(
-                        viewDefinition.entity.name,
-                        viewDefinition.fields,
-                        include,
-                    );
+                const referenceField: ReferenceField = entityField as ReferenceField;
+                if (ModelService.isVirtualEntity(referenceField.classGetter())) {
+                    (findOptions.attributes as string[]).push(referenceField.foreignKey);
                 } else {
-                    include.attributes = ModelService.getDisplayPatternFields((entityField as ReferenceField).classGetter().name).map((ef: EntityField) => ef.name);
+                    const include: IncludeOptions = {model: (entityField as ReferenceField).classGetter(), as: fieldName, required: false};
+                    if (field.subView) {
+                        const viewDefinition: ViewDefinition<any> = field.subView.prototype.$view;
+                        this.addIncludeAndAttributes(
+                            viewDefinition.entity.name,
+                            viewDefinition.fields,
+                            include,
+                        );
+                    } else {
+                        include.attributes = ModelService.getDisplayPatternFields((entityField as ReferenceField).classGetter().name).map((ef: EntityField) => ef.name);
+                    }
+                    (findOptions.include as Includeable[]).push(include);
                 }
-                (findOptions.include as Includeable[]).push(include);
             }
         }
     }
