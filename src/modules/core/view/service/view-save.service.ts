@@ -62,7 +62,12 @@ export class ViewSaveService {
                         }
                     }
                 } else if (field instanceof ReferenceField) {
-                    const id: string = typeof newValue === "string" ? newValue : newValue.id;
+                    let id: string;
+                    if (newValue === null) {
+                        id = null;
+                    } else {
+                        id = typeof newValue === "string" ? newValue : newValue.id;
+                    }
                     object.set(field.foreignKey as any, id);
                     rawObject[field.foreignKey] = id;
                 } else if (field instanceof CollectionField) {
