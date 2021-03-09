@@ -19,13 +19,14 @@ import {Validate} from "../../validation/class/validate.class";
 import {AbstractValidate} from "../../validation/class/abstract-validate.class";
 import {ViewModel} from "../../model/type/view-model.type";
 import {PermissionService} from "../../auth/service/permission.service";
+import {uniq} from "lodash";
 
 export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDefinitionConfiguration<ENTITY> {
     id: uuid;
     viewClass: ConstructorOf<View<ENTITY>>;
     fields: ViewFieldDefinition<ENTITY, any>[];
 
-    validation?: AbstractValidate;
+    private validation?: AbstractValidate;
 
     actions: ConstructorOf<AbstractAction>[];
     defaultOrder: Order;
@@ -57,19 +58,31 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
         this.meta = configuration?.meta;
 
         this.fields = fields ?? [];
+    }
 
-        const requiredFields: AbstractValidate[] = this.fields
+    public getValidation(): AbstractValidate {
+        const requiredViewFields: string[] = this.fields
             .filter((field: ViewFieldDefinition<ENTITY, any>) => field.required)
-            .map((field: ViewFieldDefinition<ENTITY, any>) => field.name)
-            .map(Validate.exists);
+            .map((field: ViewFieldDefinition<ENTITY, any>) => field.name);
 
-        if (requiredFields.length) {
+        const entityFields: Dictionary<EntityField> = ModelService.getFields(this.entity.name);
+        const requiredEntityFields: string[] = this.fields
+            .map(field => entityFields[field.name])
+            .filter(field => field.required)
+            .map(field => field.name);
+
+        let validation: AbstractValidate;
+        if (requiredViewFields.length || requiredEntityFields.length) {
+            const requiredFields: string[] = uniq([...requiredViewFields, ...requiredEntityFields]);
+            const requiredFieldsValidation: AbstractValidate[] = requiredFields.map(Validate.exists);
             if (this.validation) {
-                this.validation = Validate.and(this.validation, ...requiredFields);
+                validation = Validate.and(this.validation, ...requiredFieldsValidation);
             } else {
-                this.validation = Validate.and(...requiredFields);
+                validation = Validate.and(...requiredFieldsValidation);
             }
         }
+
+        return validation;
     }
 
     public getModel(context: RequestContext<AbstractUser>, path?: string, parentFieldPermissions?: Dictionary<boolean>): Dictionary<serializable, uuid> {

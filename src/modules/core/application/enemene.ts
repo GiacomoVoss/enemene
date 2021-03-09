@@ -53,7 +53,6 @@ export class Enemene {
             password: config.db.password,
             database: config.db.database,
             dialect: "mysql",
-            timezone: "+02:00",
             logging: sql => Enemene.log.silly("Database", sql),
         });
 

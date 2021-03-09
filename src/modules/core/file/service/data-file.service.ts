@@ -26,7 +26,7 @@ export class DataFileService {
             if (!fs.existsSync(dir)) {
                 await mkdirp(dir);
             }
-            
+
             const destination = fs.createWriteStream(filePath);
             return new Promise((resolve, reject) => {
                 https.get(url, res => {
@@ -37,7 +37,7 @@ export class DataFileService {
                             reject("No bytes written.");
                             return;
                         }
-                        Enemene.log.debug(this.constructor.name, `Saved ${filePath} (${fs.statSync(filePath).size})`);
+                        Enemene.log.debug(this.constructor.name, `Saved ${filePath} (${fs.statSync(filePath).size} bytes)`);
                         resolve(fileName);
                         return;
                     });

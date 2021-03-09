@@ -14,12 +14,12 @@ export class ValidateExists extends AbstractValidate {
     public evaluate(object: Dictionary<serializable>): ValidationResult {
         const value: string | object | undefined = get(object, this.field, undefined) as string | object | undefined;
         if (value === undefined || value === null || (typeof value === "string" && value.length === 0)) {
-            return [new ValidationFieldError(this.field, "required")];
+            return new ValidationFieldError(this.field, "required");
         }
         if (this.arg && typeof value === "object") {
             return this.arg.evaluate(value);
         }
-     
+
         return true;
     }
 }

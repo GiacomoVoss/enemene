@@ -1,3 +1,3 @@
 import {ValidationError} from "../interface/validation-error.interface";
 
-export type ValidationResult = true | ValidationError[];
+export type ValidationResult = true | ValidationError | ValidationError[];

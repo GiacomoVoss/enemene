@@ -14,7 +14,6 @@ export namespace EntityFieldType {
     export const COLLECTION = "COLLECTION";
     export const CALCULATED = "CALCULATED";
     export const ENUM = (values): string[] => {
-        console.log(values);
         return Object.values(values);
     };
 }

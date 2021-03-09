@@ -17,20 +17,22 @@ export class PermissionService {
     private permissionCache: Dictionary<{ route: Dictionary<RoutePermission[]>, view: Dictionary<ViewPermission> }, uuid> = {};
 
     public getViewFieldPermissions(viewDefinition: ViewDefinition<any>, viewField: ViewFieldDefinition<any, any>, context: RequestContext<AbstractUser>): Dictionary<boolean> {
+        let unrestricted: boolean = context instanceof UnrestrictedRequestContext;
+
         const viewPermission: ViewPermission | undefined = this.findViewPermission(viewDefinition.viewClass, context);
         const result: Dictionary<boolean> = {};
-        if (viewField.canCreate ?? viewPermission?.permissions.includes(Permission.CREATE) ?? false) {
-            result.canCreate = viewField.canCreate ?? viewPermission?.permissions.includes(Permission.CREATE);
+        if (viewField.canCreate ?? viewPermission?.permissions.includes(Permission.CREATE) ?? unrestricted ?? false) {
+            result.canCreate = viewField.canCreate ?? viewPermission?.permissions.includes(Permission.CREATE) ?? unrestricted;
         }
-        if (viewField.canUpdate ?? viewPermission?.permissions.includes(Permission.UPDATE) ?? false) {
-            result.canUpdate = viewField.canUpdate ?? viewPermission?.permissions.includes(Permission.UPDATE);
+        if (viewField.canUpdate ?? viewPermission?.permissions.includes(Permission.UPDATE) ?? unrestricted ?? false) {
+            result.canUpdate = viewField.canUpdate ?? viewPermission?.permissions.includes(Permission.UPDATE) ?? unrestricted;
         }
         if (viewField.isArray) {
-            if (viewField.canRemove ?? viewPermission?.permissions.includes(Permission.UPDATE) ?? false) {
-                result.canRemove = viewField.canRemove ?? viewField.canUpdate ?? viewPermission?.permissions.includes(Permission.UPDATE);
+            if (viewField.canRemove ?? viewPermission?.permissions.includes(Permission.UPDATE) ?? unrestricted ?? false) {
+                result.canRemove = viewField.canRemove ?? viewField.canUpdate ?? viewPermission?.permissions.includes(Permission.UPDATE) ?? unrestricted;
             }
-            if (viewField.canInsert ?? viewPermission?.permissions.includes(Permission.UPDATE) ?? false) {
-                result.canInsert = viewField.canInsert ?? viewField.canUpdate ?? viewPermission?.permissions.includes(Permission.UPDATE);
+            if (viewField.canInsert ?? viewPermission?.permissions.includes(Permission.UPDATE) ?? unrestricted ?? false) {
+                result.canInsert = viewField.canInsert ?? viewField.canUpdate ?? viewPermission?.permissions.includes(Permission.UPDATE) ?? unrestricted;
             }
         }
         return result;
@@ -149,7 +151,7 @@ export class PermissionService {
         if ((permission as RoutePermission).route) {
             const routePermission = permission as RoutePermission;
             if (!RouterService.hasRoute(routePermission.method, routePermission.route)) {
-                Enemene.log.warn(this.constructor.name, `Permission ${routePermission.id} applies to non-existing route "${routePermission.method} ${routePermission.route}".`);
+                Enemene.log.warn("PermissionService", `Permission ${routePermission.id} applies to non-existing route "${routePermission.method} ${routePermission.route}".`);
             }
             if (!this.permissionCache[routePermission.roleId].route[routePermission.route]) {
                 this.permissionCache[routePermission.roleId].route[routePermission.route] = [];

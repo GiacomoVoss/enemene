@@ -18,7 +18,7 @@ import {AbstractUser} from "../../auth";
 export class ValidationService {
 
     public validateView<ENTITY extends DataObject<ENTITY>>(view: View<ENTITY>, context: RequestContext<AbstractUser>): void {
-        this.validate(view.toJSON(), view.$view.entity.name, context.language, view.$view.validation);
+        this.validate(view.toJSON(), view.$view.entity.name, context.language, view.$view.getValidation());
     }
 
     public validate<ENTITY extends DataObject<ENTITY>>(object: Dictionary<serializable>, entity: string, language: string, validation?: AbstractValidate): void {
@@ -31,7 +31,10 @@ export class ValidationService {
         }
 
         if (result !== true) {
-            throw new InputValidationError(this.addI18nLabels(result, ModelService.getFields(entity), language), entity, language);
+            if (!Array.isArray(result)) {
+                result = [result];
+            }
+            throw new InputValidationError(this.addI18nLabels(result as ValidationError[], ModelService.getFields(entity), language), entity, language);
         }
     }
 

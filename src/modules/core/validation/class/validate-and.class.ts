@@ -15,8 +15,10 @@ export class ValidateAnd extends AbstractValidate {
             .reduce((result: ValidationResult, argResult: ValidationResult) => {
                 if (result === true) {
                     result = [argResult];
-                } else {
+                } else if (Array.isArray(result)) {
                     result.push(argResult);
+                } else {
+                    result = [result, argResult];
                 }
                 return result;
             }, true);
