@@ -2,7 +2,6 @@ export * from "./class/redirect.class";
 export * from "./class/abstract-controller.class";
 export * from "./class/unrestricted-request-context.class";
 export * from "./decorator/get.decorator";
-export * from "./decorator/get-file.decorator";
 export * from "./decorator/delete.decorator";
 export * from "./decorator/post.decorator";
 export * from "./decorator/put.decorator";

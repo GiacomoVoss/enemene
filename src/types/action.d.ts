@@ -91,6 +91,13 @@ export declare class ActionStepResultSuccess extends ActionStepResult {
 }
 
 /**
+ * Return an ActionStepResultFile to provide a file to download. The downloadable file will be available for 5 minutes.
+ */
+export class ActionStepResultFile extends ActionStepResult {
+    constructor(fileId: uuid);
+}
+
+/**
  * Annotate a class method to mark it as an action step. The step has to return an {@link ActionStepResult}.
  * @param index {number} The order index of the step.
  * @param label {string} The label to describe the step.

@@ -11,6 +11,15 @@ import https from "https";
 export class DataFileService {
 
     private mimeDetector: Magic = new Magic(MAGIC_MIME_TYPE);
+    private fileService: FileService = Enemene.app.inject(FileService);
+
+    public static TMP_FILE_PATH: string = path.join(process.cwd(), "tmpfiles");
+
+    async onStart(): Promise<void> {
+        await this.ensureDirectoryExists(DataFileService.TMP_FILE_PATH);
+        this.fileService.scanForFilePattern(DataFileService.TMP_FILE_PATH, /.*/)
+            .forEach(file => this.fileService.deleteFile(file));
+    }
 
     /**
      * Downloads the file in the given url and saves it as the given file name.
@@ -64,7 +73,7 @@ export class DataFileService {
 
     public async getMimeType(fileName: string): Promise<string> {
         return new Promise((resolve, reject) => {
-            this.mimeDetector.detectFile(this.getIndexedFilePath(fileName, true), (err, result) => {
+            this.mimeDetector.detectFile(fileName, (err, result) => {
                 if (err) {
                     reject(err);
                     return;
@@ -73,6 +82,13 @@ export class DataFileService {
                 resolve(result as string);
             });
         });
+    }
+
+    public async ensureDirectoryExists(fileName: string): Promise<void> {
+        const dirName: string = path.dirname(fileName);
+        if (!fs.existsSync(dirName)) {
+            await mkdirp(dirName);
+        }
     }
 
     public getIndexedFilePath(fileName: string, fullPath: boolean = false): string {
@@ -88,4 +104,5 @@ export class DataFileService {
             return indexedPath;
         }
     }
+
 }

@@ -3,7 +3,7 @@ import {AbstractAction} from "./class/abstract-action.class";
 import {ActionService} from "./service/action.service";
 import {ViewInitializerService} from "../view";
 import {AbstractController} from "../router/class/abstract-controller.class";
-import {AbstractUser, ActionStepResultSuccess, DataObject, DataService, Enemene} from "../../..";
+import {AbstractUser, ActionStepResultFile, ActionStepResultSuccess, DataObject, DataService, Enemene} from "../../..";
 import {ActionStepResult} from "./class/action-step-result.class";
 import {ActionResultStatus} from "./enum/action-result-status.enum";
 import {ActionStepResultForm} from "./class/action-step-result-form.class";
@@ -62,6 +62,13 @@ export default class ActionController extends AbstractController {
             return this.responseWithStatus(200, {
                 type: lastResult.status,
                 label: I18nService.getI18nizedString((lastResult as ActionStepResultSuccess).message, context.language),
+            });
+        }
+
+        if (lastResult.status === ActionResultStatus.FILE) {
+            return this.responseWithStatus(200, {
+                type: ActionResultStatus.FILE,
+                label: (lastResult as ActionStepResultFile).fileId,
             });
         }
 

@@ -17,7 +17,7 @@ export default class ViewPutController extends AbstractViewController {
     async updateObject<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
                                                           @Path("id") objectId: uuid,
                                                           @Body() data: Dictionary<serializable>,
-                                                          @Context context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
+                                                          @Context context: RequestContext<AbstractUser>): Promise<DataResponse<View<ENTITY>>> {
         const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
         const view: View<ENTITY> = await this.viewService.findById(viewDefinition.viewClass, objectId, context);
         view.setValues(data, context);
@@ -33,7 +33,7 @@ export default class ViewPutController extends AbstractViewController {
                                                           @Path("id") objectId: uuid,
                                                           @Req request: SecureRequest,
                                                           @Body() data: Dictionary<serializable>,
-                                                          @Context context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
+                                                          @Context context: RequestContext<AbstractUser>): Promise<DataResponse<View<ENTITY>>> {
 
         const attributePath = request.params[0];
         if (!attributePath || !attributePath.length) {

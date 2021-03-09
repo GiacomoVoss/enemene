@@ -31,6 +31,9 @@ import {Transaction} from "sequelize/types/lib/transaction";
 import {PopulatorController} from "../../dev/dev.controller";
 import path from "path";
 import {RequestContext} from "../interface/request-context.interface";
+import * as fs from "fs";
+import {DocumentController} from "../../document/document.controller";
+import {FileResponse} from "../class/file-response.class";
 
 export class RouterService {
 
@@ -59,6 +62,7 @@ export class RouterService {
 
         const systemControllers: ConstructorOf<AbstractController>[] = [AuthController,
             ActionController,
+            DocumentController,
             FileController,
             ViewGetController,
             ViewPostController,
@@ -123,7 +127,6 @@ export class RouterService {
                 ];
                 switch (pathDefinition.method) {
                     case RequestMethod.GET:
-                    case RequestMethod.GETFILE:
                         app.get(`/api${path}`, ...handlers, this.logError);
                         break;
                     case RequestMethod.POST:
@@ -187,7 +190,7 @@ export class RouterService {
 
     private async handle(req: SecureRequest, res: Response, next: Function, pathDefinition: PathDefinition): Promise<void> {
         let transaction: Transaction | undefined = undefined;
-        if (![RequestMethod.GET, RequestMethod.GETFILE].includes(pathDefinition.method)) {
+        if (![RequestMethod.GET].includes(pathDefinition.method)) {
             transaction = await Enemene.app.db.transaction();
         }
         const parameterValues: any[] = pathDefinition.parameters.map((param: string[]) => this.resolveParameter(req, res, param, transaction));
@@ -203,10 +206,10 @@ export class RouterService {
                 res.redirect(result.url);
             } else if (result instanceof CustomResponse) {
                 res.status(result.status).send(result.data);
-            } else if (pathDefinition.method === RequestMethod.GETFILE) {
-                if (this.dataFileService.fileExists(result)) {
-                    res.setHeader("Content-Type", await this.dataFileService.getMimeType(result));
-                    res.sendFile(this.dataFileService.getIndexedFilePath(result, true));
+            } else if (result instanceof FileResponse) {
+                if (fs.existsSync(result.filePath)) {
+                    res.setHeader("Content-Type", await this.dataFileService.getMimeType(result.filePath));
+                    res.download(result.filePath, result.fileName);
                 } else {
                     res.status(404).end();
                 }

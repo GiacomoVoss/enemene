@@ -6,7 +6,6 @@ import {Transaction} from "sequelize/types/lib/transaction";
 export declare enum RequestMethod {
     GET = "GET",
     POST = "POST",
-    GETFILE = "GETFILE",
     PUT = "PUT",
     DELETE = "DELETE"
 }
@@ -24,6 +23,9 @@ export declare abstract class AbstractController {
     protected redirect(url: string): object;
 
     protected responseWithStatus<DATA>(status: number, data: DATA): object;
+
+    protected returnFile(filePath: string, fileName: string): object;
+
 }
 
 export interface DataResponse<ENTITY> {
@@ -51,8 +53,6 @@ export declare function Post(path: string, isPublic?: boolean): Function;
 export declare function Put(path: string, isPublic?: boolean): Function;
 
 export declare function Delete(path: string, isPublic?: boolean): Function;
-
-export declare function GetFile(path: string, isPublic?: boolean): Function;
 
 export declare function Body(key?: string): Function;
 

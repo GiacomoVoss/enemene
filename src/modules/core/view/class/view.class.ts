@@ -30,14 +30,16 @@ export abstract class View<ENTITY extends DataObject<ENTITY>> {
             const field: EntityField = entityFields[fieldDefinition.name];
             if (field) {
                 if (typeof data[key] === "object" && data[key] !== undefined && fieldDefinition.subView) {
-                    if (Array.isArray(data[key])) {
+                    if (data[key] === null) {
+                        this[key] = null;
+                    } else if (Array.isArray(data[key])) {
                         this[key] = (data[key] as Dictionary<serializable>[]).map((subData: Dictionary<serializable>) => {
                             return this.createOrUpdateView(subData, fieldDefinition.subView, context);
                         });
                     } else {
                         this[key] = this.createOrUpdateView(data[key] as any, fieldDefinition.subView, context);
                     }
-                } else {
+                } else if (data[key] !== undefined) {
                     this[key] = data[key] as any;
                 }
                 if ((this[key] === undefined || this[key] === null) && (data[key] === undefined || data[key] === null)) {

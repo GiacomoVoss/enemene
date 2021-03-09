@@ -7,5 +7,6 @@ export * from "./class/action-step-result.class";
 export * from "./class/action-step-result-form.class";
 export * from "./class/action-step-result-selection.class";
 export * from "./class/action-step-result-success.class";
+export * from "./class/action-step-result-file.class";
 export * from "./class/abstract-action.class";
 export * from "./interface/action-origin-input.interface";

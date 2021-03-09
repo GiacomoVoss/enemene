@@ -20,4 +20,6 @@ export declare class DataFileService {
     public get(filename: string): Buffer;
 
     public getMimeType(fileName: string): Promise<string>;
+
+    public getIndexedFilePath(fileName: string, fullPath?: boolean): string;
 }

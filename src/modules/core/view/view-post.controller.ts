@@ -17,7 +17,7 @@ export default class ViewPostController extends AbstractViewController {
     @Post("/:view", true)
     async createObject<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
                                                           @Body() data: Dictionary<serializable>,
-                                                          @Context context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
+                                                          @Context context: RequestContext<AbstractUser>): Promise<DataResponse<View<ENTITY>>> {
         const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
         const view = new viewDefinition.viewClass();
         view.setValues(data, context);
@@ -33,7 +33,7 @@ export default class ViewPostController extends AbstractViewController {
     async createObjectWithId<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
                                                                 @Path("id") objectId: uuid,
                                                                 @Body() data: Dictionary<serializable>,
-                                                                @Context context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
+                                                                @Context context: RequestContext<AbstractUser>): Promise<DataResponse<View<ENTITY>>> {
         const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
         const view = new viewDefinition.viewClass();
         view.setValues(data, context);
@@ -51,7 +51,7 @@ export default class ViewPostController extends AbstractViewController {
                                                           @Path("id") objectId: uuid,
                                                           @Req request: SecureRequest,
                                                           @Body() data: Dictionary<serializable>,
-                                                          @Context context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
+                                                          @Context context: RequestContext<AbstractUser>): Promise<DataResponse<View<ENTITY>>> {
 
         const attributePath = request.params[0];
         if (!attributePath || !attributePath.length) {

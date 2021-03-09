@@ -44,7 +44,7 @@ export default class ViewGetController extends AbstractViewController {
         return recurse(jsonobj, prefix);
     }
 
-    private filterFields<VIEW extends View<any>>(object: VIEW, fieldsString?: string): Dictionary<serializable> | Dictionary<serializable>[] | undefined {
+    private filterFields<VIEW extends View<any>>(object: VIEW, fieldsString?: string): Dictionary<serializable> | undefined {
         if (!object) {
             return undefined;
         }
@@ -108,7 +108,7 @@ export default class ViewGetController extends AbstractViewController {
                                                                 @Query("search") search: string,
                                                                 @Req request: SecureRequest,
                                                                 @Context context: RequestContext<AbstractUser>): Promise<object> {
-        const response: DataResponse<ENTITY> = await this.getByPath(viewName, objectId, request, "id", context);
+        const response: DataResponse<Dictionary<serializable>> = await this.getByPath(viewName, objectId, request, "id", context);
         let count = 0;
         if (!Array.isArray(response.data)) {
             count = 1;
@@ -130,7 +130,7 @@ export default class ViewGetController extends AbstractViewController {
                                                         @Query("offset") offset: string,
                                                         @Query("search") searchString: string,
                                                         @Context context: RequestContext<AbstractUser>,
-                                                        @Header(HttpHeader.LANGUAGE) language: string): Promise<DataResponse<ENTITY[]>> {
+                                                        @Header(HttpHeader.LANGUAGE) language: string): Promise<DataResponse<Dictionary<serializable>[]>> {
         const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
         const data: View<ENTITY>[] = await this.viewService.findAll(viewDefinition.viewClass, context, undefined, this.viewHelperService.parseFindOptions(order, limit, offset, searchString));
         return {
@@ -144,10 +144,10 @@ export default class ViewGetController extends AbstractViewController {
     async getObject<ENTITY extends DataObject<ENTITY>>(@Path("view") viewName: string,
                                                        @Path("id") objectId: string,
                                                        @Query("fields") requestedFields: string,
-                                                       @Context context: RequestContext<AbstractUser>): Promise<DataResponse<ENTITY>> {
+                                                       @Context context: RequestContext<AbstractUser>): Promise<DataResponse<Dictionary<serializable>>> {
         const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
         return {
-            data: this.filterFields(await this.viewService.findById(viewDefinition.viewClass, objectId, context), requestedFields) as Dictionary<any, keyof ENTITY>,
+            data: this.filterFields(await this.viewService.findById(viewDefinition.viewClass, objectId, context), requestedFields),
             model: viewDefinition.getModel(context),
             actions: viewDefinition.getActionConfigurations(),
         };
@@ -158,7 +158,7 @@ export default class ViewGetController extends AbstractViewController {
                                                        @Path("id") objectId: string,
                                                        @Req request: SecureRequest,
                                                        @Query("fields") requestedFields: string,
-                                                       @Context context: RequestContext<AbstractUser>): Promise<DataResponse<any>> {
+                                                       @Context context: RequestContext<AbstractUser>): Promise<DataResponse<Dictionary<serializable>>> {
         const attributePath = request.params[0];
         if (!attributePath || !attributePath.length) {
             return this.getObject(viewName, objectId, requestedFields, context);
@@ -192,7 +192,7 @@ export default class ViewGetController extends AbstractViewController {
     @Get("/allowedValues/:view/:attribute", true)
     async getAllowedValues<ENTITY extends DataObject<ENTITY>, SUBENTITY extends DataObject<SUBENTITY>>(@Path("view") viewName: string,
                                                                                                        @Path("attribute") attribute: keyof ENTITY,
-                                                                                                       @Context context: RequestContext<AbstractUser>): Promise<DataResponse<any>> {
+                                                                                                       @Context context: RequestContext<AbstractUser>): Promise<DataResponse<View<SUBENTITY>[]>> {
 
         const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
 
@@ -214,7 +214,7 @@ export default class ViewGetController extends AbstractViewController {
         // const data: View<SUBENTITY>[] = await this.viewService.findAll(subViewDefinition.viewClass, new UnrestrictedRequestContext(), allowedValuesFilter);
         const data: DataObject<ENTITY>[] = await this.dataService.findAll(subViewDefinition.entity, allowedValuesFilter);
         return {
-            data: data.map(d => this.viewHelperService.wrap(d, subViewDefinition)),
+            data: data.map(d => this.viewHelperService.wrap(d, subViewDefinition)) as View<SUBENTITY>[],
             model: viewDefinition.getModel(context),
         };
     }

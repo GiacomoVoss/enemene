@@ -3,6 +3,7 @@ export * from "./types/application";
 export * from "./types/auth";
 export * from "./types/base";
 export * from "./types/controller";
+export * from "./types/document";
 export * from "./types/error";
 export * from "./types/file";
 export * from "./types/filter";

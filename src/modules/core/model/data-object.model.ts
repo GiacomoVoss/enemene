@@ -12,7 +12,7 @@ export class DataObject<E> extends Model {
 
     id: string;
 
-    constructor(values?: Dictionary<any, keyof E>, options?: BuildOptions) {
+    constructor(values?: Dictionary<any>, options?: BuildOptions) {
         super(values, options);
     }
 
