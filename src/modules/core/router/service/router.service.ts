@@ -247,6 +247,7 @@ export class RouterService {
                 } else {
                     parameterValue = req.body;
                 }
+                optional = true;
                 break;
             case ParameterType.CONTEXT:
                 context = req.query["context"] ? JSON.parse(req.query["context"] as string) : {};

@@ -43,6 +43,9 @@ export class ViewService {
 
     public async delete<ENTITY extends DataObject<ENTITY>>(view: View<ENTITY>,
                                                            context: RequestContext<AbstractUser>): Promise<void> {
-        await DataService.delete(new DataObject<ENTITY>({id: view.id}), context);
+        const object: DataObject<ENTITY> = await DataService.findById(view.$view.entity, view.id, {
+            transaction: context.transaction,
+        });
+        await DataService.delete(object, context);
     }
 }

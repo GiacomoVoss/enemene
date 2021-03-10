@@ -1,6 +1,6 @@
 import {EntityField} from "../interface/entity-field.class";
 import {Dictionary} from "../../../../base/type/dictionary.type";
-import {camelCase, snakeCase} from "lodash";
+import {camelCase, lowerFirst, snakeCase} from "lodash";
 import {DataObject} from "../data-object.model";
 import {ManyToManyField} from "../interface/many-to-many-field.class";
 import {CompositionField} from "../interface/composition-field.class";
@@ -202,8 +202,8 @@ export class ModelService {
                                 const throughTokens: string[] = [modelName, entityField.classGetter().name];
                                 throughTokens.sort();
                                 const throughModelName = throughTokens.join("");
-                                const foreignKey: string = `${camelCase(modelName)}Id`;
-                                const otherKey: string = `${camelCase(entityField.classGetter().name)}Id`;
+                                const foreignKey: string = lowerFirst(`${camelCase(modelName)}Id`);
+                                const otherKey: string = lowerFirst(`${camelCase(entityField.classGetter().name)}Id`);
                                 attributes[foreignKey] = {
                                     type: DataTypes.STRING,
                                     unique: true,
