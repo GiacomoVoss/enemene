@@ -9,6 +9,7 @@ export class ViewFieldDefinition<ENTITY extends DataObject<ENTITY>, SUBENTITY ex
     public name: keyof View<ENTITY>;
     public description?: string | string[];
     public position: number;
+    public calculated: boolean;
     public required: boolean;
     public fieldType?: any;
     public subView?: ConstructorOf<View<SUBENTITY>>;
@@ -34,6 +35,7 @@ export class ViewFieldDefinition<ENTITY extends DataObject<ENTITY>, SUBENTITY ex
         this.canInsert = configuration.canInsert ?? undefined;
         this.canRemove = configuration.canRemove ?? undefined;
         this.default = configuration.default;
+        this.calculated = configuration.calculated;
     }
 
     toJSON() {
@@ -41,6 +43,7 @@ export class ViewFieldDefinition<ENTITY extends DataObject<ENTITY>, SUBENTITY ex
             position: this.position,
             name: this.name,
             description: this.description,
+            calculated: this.calculated,
             required: this.required,
             subView: this.subView?.name,
             isArray: this.isArray,

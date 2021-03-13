@@ -38,7 +38,10 @@ export class DocumentService {
         const browser = await puppeteer.launch({args: ["--no-sandbox", "--disable-setuid-sandbox"]});
         const page = await browser.newPage();
         await page.setCacheEnabled(false);
-        await page.setContent(template(context), {
+        await page.setContent(template({
+            ...this.getDefaultContext(),
+            ...context,
+        }), {
             waitUntil: "networkidle2",
         });
         await page.emulateMediaType("screen");
@@ -52,9 +55,9 @@ export class DocumentService {
             headerTemplate: this.getHeaderTemplate(options.headline),
             footerTemplate: this.getFooterTemplate(options.showPageNumbers),
             margin: {
-                top: "1.5cm",
+                top: "0.5cm",
                 right: "0.5cm",
-                bottom: "1.5cm",
+                bottom: "1cm",
                 left: "0.5cm"
             },
         });
@@ -89,5 +92,11 @@ export class DocumentService {
 
     private getFooterTemplate(showPageNumbers: boolean = false): string {
         return showPageNumbers ? `<span style="width: 100%; text-align: right; padding-right: 1cm; font-size: 8pt; color: #aaa;"><span class="pageNumber"></span> / <span class="totalPages"></span></span>` : "";
+    }
+
+    private getDefaultContext(): Dictionary<serializable> {
+        return {
+            now: new Date(),
+        };
     }
 }

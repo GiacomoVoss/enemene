@@ -25,33 +25,37 @@ export class ViewInitializerService {
         const viewFiles: string[] = this.fileService.scanForFilePattern(Enemene.app.config.modulesPath, /.*\.view\.js/);
         await Promise.all(viewFiles.map((filePath: string) => import(filePath)));
         Object.entries(Enemene.app.db.models).forEach(([entity, model]) => {
+            const fields: ViewFieldDefinition<any, any>[] = ModelService.getDisplayPatternFields(entity)
+                .map((entityField: EntityField, position: number) => new ViewFieldDefinition(entityField.name as any, {name: "String"}, {
+                    position,
+                }));
             ViewInitializerService.SELECTION_VIEW_DEFINITIONS[entity] = new ViewDefinition<any>(
                 UuidService.getUuid(),
                 () => model,
                 class SelectionView extends View<any> {
+                    $fields = fields;
                     public $view: any = {
                         entity: model,
                     };
                 },
-                ModelService.getDisplayPatternFields(entity)
-                    .map((entityField: EntityField, position: number) => new ViewFieldDefinition(entityField.name as any, {name: "String"}, {
-                        position,
-                    })),
+                fields,
             );
         });
         Object.entries(ModelService.VIRTUAL_MODELS).forEach(([entity, model]) => {
+            const fields: ViewFieldDefinition<any, any>[] = ModelService.getDisplayPatternFields(entity)
+                .map((entityField: EntityField, position: number) => new ViewFieldDefinition(entityField.name as any, {name: "String"}, {
+                    position,
+                }));
             ViewInitializerService.SELECTION_VIEW_DEFINITIONS[entity] = new ViewDefinition<any>(
                 UuidService.getUuid(),
                 () => model,
                 class SelectionView extends View<any> {
+                    $fields = fields;
                     public $view: any = {
                         entity: model,
                     };
                 },
-                ModelService.getDisplayPatternFields(entity)
-                    .map((entityField: EntityField, position: number) => new ViewFieldDefinition(entityField.name as any, {name: "String"}, {
-                        position,
-                    })),
+                fields,
             );
         });
     }

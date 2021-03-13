@@ -158,42 +158,44 @@ export class ViewHelperService {
             findOptions.include = [];
         }
         for (const field of fields) {
-            let fieldName: string = field.name as string;
+            if (!field.calculated) {
+                let fieldName: string = field.name as string;
 
-            let entityField: EntityField = model[fieldName];
-            if (!entityField) {
-                fieldName = fieldName.substr(0, fieldName.indexOf(".$count"));
-                entityField = model[fieldName];
-            }
-            if (!entityField) {
-                throw new UnsupportedOperationError(`Unknown field ${chalk.bold(fieldName)} in entity ${chalk.bold(entity)}.`);
-            }
-            if (entityField.isSimpleField) {
-                (findOptions.attributes as string[]).push(fieldName);
-            } else if (entityField instanceof CalculatedField) {
-                const includes: ViewFieldDefinition<any, any>[] = entityField.includeFields
-                    .filter((f: string) => !f.includes("."))
-                    .map((f: string, position: number) => new ViewFieldDefinition<any, any>(f as any, entityField.type, {
-                        position,
-                    }));
-                this.addIncludeAndAttributes(entity, includes, findOptions);
-            } else {
-                const referenceField: ReferenceField = entityField as ReferenceField;
-                if (ModelService.isVirtualEntity(referenceField.classGetter())) {
-                    (findOptions.attributes as string[]).push(referenceField.foreignKey);
+                let entityField: EntityField = model[fieldName];
+                if (!entityField) {
+                    fieldName = fieldName.substr(0, fieldName.indexOf(".$count"));
+                    entityField = model[fieldName];
+                }
+                if (!entityField) {
+                    throw new UnsupportedOperationError(`Unknown field ${chalk.bold(fieldName)} in entity ${chalk.bold(entity)}.`);
+                }
+                if (entityField.isSimpleField) {
+                    (findOptions.attributes as string[]).push(fieldName);
+                } else if (entityField instanceof CalculatedField) {
+                    const includes: ViewFieldDefinition<any, any>[] = entityField.includeFields
+                        .filter((f: string) => !f.includes("."))
+                        .map((f: string, position: number) => new ViewFieldDefinition<any, any>(f as any, entityField.type, {
+                            position,
+                        }));
+                    this.addIncludeAndAttributes(entity, includes, findOptions);
                 } else {
-                    const include: IncludeOptions = {model: (entityField as ReferenceField).classGetter(), as: fieldName, required: false};
-                    if (field.subView) {
-                        const viewDefinition: ViewDefinition<any> = field.subView.prototype.$view;
-                        this.addIncludeAndAttributes(
-                            viewDefinition.entity.name,
-                            viewDefinition.fields,
-                            include,
-                        );
+                    const referenceField: ReferenceField = entityField as ReferenceField;
+                    if (ModelService.isVirtualEntity(referenceField.classGetter())) {
+                        (findOptions.attributes as string[]).push(referenceField.foreignKey);
                     } else {
-                        include.attributes = ModelService.getDisplayPatternFields((entityField as ReferenceField).classGetter().name).map((ef: EntityField) => ef.name);
+                        const include: IncludeOptions = {model: (entityField as ReferenceField).classGetter(), as: fieldName, required: false};
+                        if (field.subView) {
+                            const viewDefinition: ViewDefinition<any> = field.subView.prototype.$view;
+                            this.addIncludeAndAttributes(
+                                viewDefinition.entity.name,
+                                viewDefinition.fields,
+                                include,
+                            );
+                        } else {
+                            include.attributes = ModelService.getDisplayPatternFields((entityField as ReferenceField).classGetter().name).map((ef: EntityField) => ef.name);
+                        }
+                        (findOptions.include as Includeable[]).push(include);
                     }
-                    (findOptions.include as Includeable[]).push(include);
                 }
             }
         }

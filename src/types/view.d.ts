@@ -95,6 +95,11 @@ export interface ViewFieldConfiguration<SUBENTITY extends DataObject<SUBENTITY>,
     description?: string | string[];
 
     /**
+     * Defines if the field is a calculated field. Only use this with a getter function.
+     */
+    calculated?: boolean;
+
+    /**
      * A flag determining if the value of this view field can be updated. Overwrites the permissions specified in {@link ViewPermission#permissions}.
      */
     canUpdate?: boolean;
@@ -140,6 +145,7 @@ export class ViewFieldDefinition<ENTITY extends DataObject<ENTITY>, SUBENTITY ex
     public name: keyof View<ENTITY>;
     public description?: string | string[];
     public position: number;
+    public calculated?: boolean;
     public required: boolean;
     public fieldType?: any;
     public subView?: ConstructorOf<View<SUBENTITY>>;

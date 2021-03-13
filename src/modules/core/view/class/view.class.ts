@@ -1,7 +1,7 @@
 import {DataObject} from "../../model";
 import {ViewFieldDefinition} from "..";
 import {uuid} from "../../../../base/type/uuid.type";
-import {get, omit} from "lodash";
+import {get, pick} from "lodash";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {serializable} from "../../../../base/type/serializable.type";
 import {EntityField} from "../../model/interface/entity-field.class";
@@ -26,25 +26,27 @@ export abstract class View<ENTITY extends DataObject<ENTITY>> {
     public setValues(data: Dictionary<serializable>, context: RequestContext<AbstractUser>): void {
         const entityFields: Dictionary<EntityField, keyof ENTITY> = ModelService.getFields(this.$view.entity.name);
         for (const fieldDefinition of this.$view.fields) {
-            const key: string = fieldDefinition.name;
-            const field: EntityField = entityFields[fieldDefinition.name];
-            if (field) {
-                if (typeof data[key] === "object" && data[key] !== undefined && fieldDefinition.subView) {
-                    if (data[key] === null) {
-                        this[key] = null;
-                    } else if (Array.isArray(data[key])) {
-                        this[key] = (data[key] as Dictionary<serializable>[]).map((subData: Dictionary<serializable>) => {
-                            return this.createOrUpdateView(subData, fieldDefinition.subView, context);
-                        });
-                    } else {
-                        this[key] = this.createOrUpdateView(data[key] as any, fieldDefinition.subView, context);
+            if (!fieldDefinition.calculated) {
+                const key: string = fieldDefinition.name;
+                const field: EntityField = entityFields[fieldDefinition.name];
+                if (field) {
+                    if (typeof data[key] === "object" && data[key] !== undefined && fieldDefinition.subView) {
+                        if (data[key] === null) {
+                            this[key] = null;
+                        } else if (Array.isArray(data[key])) {
+                            this[key] = (data[key] as Dictionary<serializable>[]).map((subData: Dictionary<serializable>) => {
+                                return this.createOrUpdateView(subData, fieldDefinition.subView, context);
+                            });
+                        } else {
+                            this[key] = this.createOrUpdateView(data[key] as any, fieldDefinition.subView, context);
+                        }
+                    } else if (data[key] !== undefined) {
+                        this[key] = data[key] as any;
                     }
-                } else if (data[key] !== undefined) {
-                    this[key] = data[key] as any;
-                }
-                if ((this[key] === undefined || this[key] === null) && (data[key] === undefined || data[key] === null)) {
-                    if (fieldDefinition.default) {
-                        this[key] = fieldDefinition.default(context);
+                    if ((this[key] === undefined || this[key] === null) && (data[key] === undefined || data[key] === null)) {
+                        if (fieldDefinition.default) {
+                            this[key] = fieldDefinition.default(context);
+                        }
                     }
                 }
             }
@@ -88,9 +90,12 @@ export abstract class View<ENTITY extends DataObject<ENTITY>> {
     }
 
     public toJSON(): object {
+        const fields: string[] = this.$fields?.map(field => field.name) ?? Object.getOwnPropertyNames(this);
         return {
-            ...omit(this, "$view", "$fields"),
+            id: this.id,
             $entity: this.$view.entity.name,
+            $displayPattern: this.$displayPattern,
+            ...pick(this, fields),
         };
     }
 }

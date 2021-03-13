@@ -68,7 +68,7 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
         const entityFields: Dictionary<EntityField> = ModelService.getFields(this.entity.name);
         const requiredEntityFields: string[] = this.fields
             .map(field => entityFields[field.name])
-            .filter(field => field.required)
+            .filter(field => field?.required)
             .map(field => field.name);
 
         let validation: AbstractValidate;

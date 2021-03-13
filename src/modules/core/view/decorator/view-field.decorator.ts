@@ -7,6 +7,7 @@ import {AbstractUser} from "../../auth";
 export interface ViewFieldConfiguration<SUBENTITY extends DataObject<SUBENTITY>, SUBVIEW extends View<SUBENTITY>> {
     position: number;
     description?: string | string[],
+    calculated?: boolean;
     canUpdate?: boolean;
     canCreate?: boolean;
     canInsert?: boolean;

@@ -217,7 +217,11 @@ export class RouterService {
                 res.send(result);
             }
         } catch (e) {
-            await transaction?.rollback();
+            try {
+                await transaction?.rollback();
+            } catch (e) {
+
+            }
             throw e;
         }
     }
