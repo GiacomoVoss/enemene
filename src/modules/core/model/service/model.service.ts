@@ -91,6 +91,7 @@ export class ModelService {
             import("../../auth/model/route-permission.model"),
             import("../../auth/model/view-permission.model"),
             import("../../file/model/file.model"),
+            import("../../migration/model/migration.model"),
         ]);
         const modelFiles: string[] = app.inject(FileService).scanForFilePattern(app.config.modulesPath, /.*\.model\.js/);
         const modules: any[] = await Promise.all(modelFiles.map((filePath: string) => import(filePath)));

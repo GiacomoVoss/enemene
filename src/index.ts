@@ -13,6 +13,7 @@ export * from "./modules/core/auth";
 export * from "./modules/core/filter";
 export * from "./modules/core/file/model/file.model";
 export * from "./modules/core/file/file.controller";
+export * from "./modules/core/migration";
 export * from "./modules/core/router";
 export * from "./modules/core/service/date.service";
 export * from "./modules/core/service/uuid.service";

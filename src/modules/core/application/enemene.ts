@@ -18,6 +18,7 @@ import {FileService} from "../file/service/file.service";
 import {ModelService} from "../model/service/model.service";
 import {ViewInitializerService} from "../view";
 import {UnrestrictedRequestContext} from "../router";
+import {MigrationService} from "../migration/service/migration.service";
 import bodyParser = require("body-parser");
 
 require("express-async-errors");
@@ -109,6 +110,10 @@ export class Enemene {
 
     private async setup(): Promise<void> {
         await this.inject(ModelService).init(this);
+        const migrationSuccess: boolean = await (new MigrationService(new FileService(), Enemene.log, Enemene.app.db)).execute();
+        if (!migrationSuccess) {
+            process.exit(1);
+        }
         await this.setupServices();
         this.routerService = this.inject(RouterService);
         await this.setupControllers();
