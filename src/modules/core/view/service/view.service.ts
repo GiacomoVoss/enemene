@@ -10,6 +10,7 @@ import {Enemene} from "../../application";
 import {ViewSaveService} from "./view-save.service";
 import {uuid} from "../../../../base/type/uuid.type";
 import {DataService} from "../../data";
+import {ObjectNotFoundError} from "../../error";
 
 export class ViewService {
 
@@ -34,6 +35,16 @@ export class ViewService {
                                                                                         objectId: uuid,
                                                                                         context: RequestContext<AbstractUser>): Promise<VIEW | undefined> {
         return this.viewFindService.findById(viewClass, objectId, context);
+    }
+
+    public async findNotNullById<ENTITY extends DataObject<ENTITY>, VIEW extends View<ENTITY>>(viewClass: ConstructorOf<VIEW>,
+                                                                                               objectId: uuid,
+                                                                                               context: RequestContext<AbstractUser>): Promise<VIEW> {
+        const result: VIEW | undefined = await this.viewFindService.findById(viewClass, objectId, context);
+        if (!result) {
+            throw new ObjectNotFoundError(viewClass.name);
+        }
+        return result;
     }
 
     public async save<ENTITY extends DataObject<ENTITY>>(view: View<ENTITY>,

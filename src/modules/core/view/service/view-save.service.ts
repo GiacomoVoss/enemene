@@ -3,7 +3,7 @@ import {View} from "../class/view.class";
 import {RequestContext} from "../../router/interface/request-context.interface";
 import {AbstractUser, PermissionService} from "../../auth";
 import {uuid} from "../../../../base/type/uuid.type";
-import {AfterCreateHook, BeforeCreateHook, DataService} from "../../data";
+import {AfterCreateHook, BeforeCreateHook, BeforeUpdateHook, DataService} from "../../data";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {EntityField} from "../../model/interface/entity-field.class";
 import {ModelService} from "../../model/service/model.service";
@@ -12,15 +12,18 @@ import {ReferenceField} from "../../model/interface/reference-field.class";
 import {CollectionField} from "../../model/interface/collection-field.class";
 import {ValidationService} from "../../validation/service/validation.service";
 import {Enemene} from "../../application";
-import {ViewFindService} from "./view-find.service";
 import {RequestMethod} from "../../router/enum/request-method.enum";
 import {ViewDefinition} from "../class/view-definition.class";
 import {UuidService} from "../../service/uuid.service";
 import {ViewFieldDefinition} from "../class/view-field-definition.class";
+import {serializable} from "../../../../base/type/serializable.type";
+import {ViewHelperService} from "./view-helper.service";
+import {ViewFindService} from "./view-find.service";
 
 export class ViewSaveService {
 
     private validationService: ValidationService = Enemene.app.inject(ValidationService);
+    private viewHelperService: ViewHelperService = Enemene.app.inject(ViewHelperService);
     private viewFindService: ViewFindService = Enemene.app.inject(ViewFindService);
     private permissionService: PermissionService = Enemene.app.inject(PermissionService);
 
@@ -31,23 +34,25 @@ export class ViewSaveService {
         } else {
             this.checkPermission(view.$view, RequestMethod.PUT, context);
         }
-        const viewId: uuid = await this.saveInternal(view, context);
-        return this.viewFindService.findById(view.$view.viewClass, viewId, context);
+        return await this.saveInternal(view, context) as View<ENTITY>;
     }
 
     private async saveInternal<ENTITY extends DataObject<ENTITY>>(view: View<ENTITY>,
                                                                   context: RequestContext<AbstractUser>,
-                                                                  parentFieldPermissions?: Dictionary<boolean>): Promise<uuid> {
+                                                                  parentFieldPermissions?: Dictionary<boolean>): Promise<View<DataObject<ENTITY>>> {
         this.validationService.validateView(view, context);
         let object: DataObject<ENTITY>;
+        let oldObject: any;
         if (view.isNew) {
             object = new view.$view.entity({
                 id: view.id ?? UuidService.getUuid(),
             });
         } else {
             object = await DataService.findNotNullById(view.$view.entity, view.id, {transaction: context.transaction});
+            oldObject = object.toJSON();
         }
-        const rawObject: any = object.toJSON();
+
+        const newObject: any = object.toJSON();
         const fields: Dictionary<EntityField, keyof ENTITY> = ModelService.getFields(view.$view.entity.name);
         for (const [key, newValue] of Object.entries(view)) {
             const viewField: ViewFieldDefinition<any, any> = view.$view.fields.find(f => f.name === key);
@@ -65,14 +70,15 @@ export class ViewSaveService {
                                 // Remove object:
                                 view[key] = null;
                                 object.set(field.foreignKey as any, null);
-                                rawObject[key] = null;
+                                newObject[key] = null;
                             } else if (newValue) {
                                 // Change object content or save new object:
-                                const newValueId: uuid = await this.saveInternal(newValue, context);
-                                rawObject[key] = newValue.toJSON();
-                                if (newValueId !== myValue?.id) {
-                                    object.set(field.foreignKey as any, newValueId);
-                                    rawObject[field.foreignKey] = newValueId;
+                                const newValueView: View<any> = await this.saveInternal(newValue, context);
+                                newObject[key] = newValue.toJSON();
+                                if (newValueView.id !== myValue?.id) {
+                                    object.set(field.foreignKey as any, newValueView.id);
+                                    newObject[field.foreignKey] = newValueView.id;
+                                    view[key] = newValueView;
                                 }
                             }
                         } else if (field instanceof ReferenceField) {
@@ -83,19 +89,24 @@ export class ViewSaveService {
                                 id = typeof newValue === "string" ? newValue : newValue.id;
                             }
                             object.set(field.foreignKey as any, id);
-                            rawObject[field.foreignKey] = id;
+                            newObject[field.foreignKey] = id;
+                            if (viewField.subView) {
+                                object[field.name] = await object[this.getObjectFunction(object, field, "get")]({transaction: context.transaction}) as DataObject<any>;
+                            } else {
+                                object[field.name] = id;
+                            }
                         } else if (field instanceof CollectionField) {
                             const myValue: DataObject<any>[] = await object[this.getObjectFunction(object, field, "get")]({transaction: context.transaction}) as DataObject<any>[] ?? [];
                             const newData: any[] = [];
                             if (newValue == null && permissions.canRemove) {
                                 object.set(key as any, []);
-                                rawObject[key] = [];
+                                newObject[key] = [];
                                 view[key] = [];
                             } else {
                                 for (const d of newValue) {
                                     if (field.composition && typeof d === "object") {
                                         if (!d.isNew || permissions.canInsert) {
-                                            await this.saveInternal(d, context, permissions);
+                                            Object.assign(d, await this.saveInternal(d, context, permissions));
                                         }
                                     }
                                     newData.push(d);
@@ -108,10 +119,10 @@ export class ViewSaveService {
                                 await Promise.all(deletedObjects.map(async deletedObject => await deletedObject.destroy({transaction: context.transaction})));
                             }
                             await object[this.getObjectFunction(object, field, "set")](newDataIds, {transaction: context.transaction});
-                            rawObject[key] = newData;
+                            newObject[key] = newData;
                             view[key] = newData;
                         } else if (field && field.name !== "id" && !field.options?.references) {
-                            rawObject[key] = newValue;
+                            newObject[key] = newValue;
                             object.set(key as any, newValue);
                         }
                     }
@@ -120,12 +131,10 @@ export class ViewSaveService {
         }
 
         const isNewRecord: boolean = object.isNewRecord;
-        await this.executeBeforeHooks(object, context);
+        await this.executeBeforeHooks(object, context, oldObject);
         await object.save({transaction: context.transaction});
         await this.executeAfterHooks(object, context, isNewRecord);
-        view.id = object.id;
-        view.isNew = false;
-        return object.id;
+        return this.viewHelperService.wrap(object, view.$view, object.$entity);
     }
 
     private getObjectFunction<ENTITY extends DataObject<ENTITY>>(object: DataObject<ENTITY>,
@@ -134,11 +143,14 @@ export class ViewSaveService {
         return `${prefix}${field.name.substr(0, 1).toUpperCase()}${field.name.substr(1)}`;
     }
 
-    private async executeBeforeHooks(object: DataObject<any>, context: RequestContext<AbstractUser>): Promise<void> {
+    private async executeBeforeHooks(object: DataObject<any>, context: RequestContext<AbstractUser>, oldObject?: Dictionary<serializable>): Promise<void> {
         if (object.isNewRecord) {
             if ((object as unknown as BeforeCreateHook).onBeforeCreate) {
                 await (object as unknown as BeforeCreateHook).onBeforeCreate(context);
             }
+        }
+        if (oldObject && (object as unknown as BeforeUpdateHook).onBeforeUpdate) {
+            await (object as unknown as BeforeUpdateHook).onBeforeUpdate(context, oldObject);
         }
     }
 

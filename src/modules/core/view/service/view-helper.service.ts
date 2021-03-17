@@ -14,7 +14,6 @@ import {Includeable, OrderItem} from "sequelize/types/lib/model";
 import {UnsupportedOperationError} from "../../error";
 import chalk from "chalk";
 import {CalculatedField} from "../../model/interface/calculated-field.class";
-import {ViewInitializerService} from "./view-initializer.service";
 import {ViewFindOptions} from "../interface/view-find-options.interface";
 
 export class ViewHelperService {
@@ -44,7 +43,7 @@ export class ViewHelperService {
                                 const subViewDefinition: ViewDefinition<any> = viewField.subView.prototype.$view;
                                 return this.wrap(subValue as unknown as DataObject<ENTITY>, subViewDefinition, subViewDefinition.entity.name) as any;
                             } else if ((entityField as ReferenceField).classGetter) {
-                                return typeof subValue === "string" ? subValue : this.wrap(subValue, ViewInitializerService.getSelectionViewDefinition((entityField as ReferenceField).classGetter()), (entityField as ReferenceField).classGetter().name);
+                                return typeof subValue === "string" ? subValue : subValue.id;
                             } else {
                                 return subValue;
                             }
@@ -54,7 +53,7 @@ export class ViewHelperService {
                             const subViewDefinition: ViewDefinition<any> = viewField.subView.prototype.$view;
                             view[fieldName] = this.wrap(value as unknown as DataObject<ENTITY>, subViewDefinition, subViewDefinition.entity.name) as any;
                         } else if ((entityField as ReferenceField).classGetter) {
-                            view[fieldName] = typeof value === "string" ? value : this.wrap(value, ViewInitializerService.getSelectionViewDefinition((entityField as ReferenceField).classGetter()), (entityField as ReferenceField).classGetter().name);
+                            view[fieldName] = typeof value === "string" ? value : value.id;
                         } else {
                             view[fieldName] = value;
                         }
@@ -162,7 +161,7 @@ export class ViewHelperService {
                 let fieldName: string = field.name as string;
 
                 let entityField: EntityField = model[fieldName];
-                if (!entityField) {
+                if (!entityField && fieldName.includes(".$count")) {
                     fieldName = fieldName.substr(0, fieldName.indexOf(".$count"));
                     entityField = model[fieldName];
                 }

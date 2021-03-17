@@ -197,6 +197,17 @@ export declare class ViewService {
                                                                                   context: RequestContext<AbstractUser>): Promise<VIEW | undefined>;
 
     /**
+     * Returns the object with the given ID or throws an {@link ObjectNotFoundError} if the object could not be found.
+     *
+     * @param viewClass {ConstructorOf<VIEW>} The {@link View} class to request.
+     * @param objectId {uuid} The ID of the object to find.
+     * @param context {RequestContext<AbstractUser>} The context of the current request.
+     */
+    public findNotNullById<ENTITY extends DataObject<ENTITY>, VIEW extends View<ENTITY>>(viewClass: ConstructorOf<VIEW>,
+                                                                                         objectId: uuid,
+                                                                                         context: RequestContext<AbstractUser>): Promise<VIEW>;
+
+    /**
      * Saves the given view object.
      * @param view {View<ENTITY>} The object to save.
      * @param context {RequestContext<AbstractUser>} The context of the current request

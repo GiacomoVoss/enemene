@@ -54,6 +54,9 @@ export class Enemene {
             password: config.db.password,
             database: config.db.database,
             dialect: "mysql",
+            dialectOptions: {
+                multipleStatements: true,
+            },
             logging: sql => Enemene.log.silly("Database", sql),
         });
 

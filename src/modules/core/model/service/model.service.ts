@@ -266,7 +266,13 @@ export class ModelService {
                 if (entityField.type === EntityFieldType.STRING_ARRAY) {
                     options.get = function (this: Model) {
                         const value = this.getDataValue(propertyKey as keyof Model) as any;
-                        return value ? JSON.parse(value) : undefined;
+                        if (value === undefined || value === null) {
+                            return value;
+                        }
+                        if (typeof value === "string") {
+                            return JSON.parse(value);
+                        }
+                        return value;
                     };
                     options.set = function (this: Model, value: string) {
                         this.setDataValue(propertyKey as keyof Model, value as any);
