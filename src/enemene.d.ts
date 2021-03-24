@@ -14,3 +14,4 @@ export * from "./types/util";
 export * from "./types/validation";
 export * from "./types/view";
 export * from "./types/populator";
+export * from "./types/cqrs";

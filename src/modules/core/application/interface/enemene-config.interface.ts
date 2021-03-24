@@ -1,6 +1,8 @@
 import {LogLevel} from "../../log";
 import {AbstractUser} from "../../auth";
 import {uuid} from "../../../../base/type/uuid.type";
+import {AbstractUserReadModel} from "../../auth/interface/abstract-user-read-model.interface";
+import {ConstructorOf} from "../../../../base/constructor-of";
 
 export interface EnemeneConfig {
     /**
@@ -74,7 +76,7 @@ export interface EnemeneConfig {
         sslPassphrase?: string;
     }
 
-    userModel: typeof AbstractUser;
+    userModel: ConstructorOf<AbstractUser | AbstractUserReadModel>;
 
     languages?: string[];
 

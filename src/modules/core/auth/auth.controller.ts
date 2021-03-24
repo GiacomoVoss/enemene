@@ -15,23 +15,14 @@ export default class AuthController extends AbstractController {
                 @Body("populator") populator: boolean): Promise<string> {
 
         if (Enemene.app.devMode && populator) {
-            return AuthService.createToken(Enemene.app.config.userModel.build({
-                id: "5831500b-9ad0-4c82-b425-6373b0cc6f8f",
-                username: "populator",
-                roleId: "populator"
-            }), true);
+            return AuthService.createPopulatorUserToken();
         }
 
         if (!username || !password) {
             throw new UnauthorizedError();
         }
 
-        const user: AbstractUser = await Enemene.app.config.userModel.findOne<AbstractUser>({
-            where: {
-                username: username,
-                active: true,
-            }
-        });
+        const user: AbstractUser | null = await AuthService.findUser(username);
 
         if (!user) {
             throw new UnauthorizedError();

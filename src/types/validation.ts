@@ -1,5 +1,4 @@
 import {serializable} from "./base";
-import {Dictionary} from "../base/type/dictionary.type";
 
 export type ValidationResult = true | ValidationError[];
 
@@ -8,7 +7,7 @@ export declare class ValidationError {
 
 export abstract class AbstractValidate {
 
-    public abstract evaluate(object: Dictionary<serializable>): ValidationResult;
+    public abstract evaluate(object: any): ValidationResult;
 }
 
 export declare class Validate {

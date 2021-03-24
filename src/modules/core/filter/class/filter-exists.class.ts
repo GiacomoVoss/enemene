@@ -47,7 +47,7 @@ export class FilterExists extends AbstractFilter {
         }
     }
 
-    evaluate(object: Dictionary<serializable>): boolean {
+    public evaluate(object: any): boolean {
         const subObject: Dictionary<serializable> = get(object, this.field, null);
         if (subObject === null) {
             return false;

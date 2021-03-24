@@ -1,5 +1,6 @@
 export * from "./error/forbidden.error";
 export * from "./interface/abstract-user.interface";
+export * from "./interface/abstract-user-read-model.interface";
 export * from "./interface/secure-request.interface";
 export * from "./model/role.model";
 export * from "./model/route-permission.model";

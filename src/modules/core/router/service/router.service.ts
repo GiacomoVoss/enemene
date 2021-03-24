@@ -9,20 +9,13 @@ import {RequestMethod} from "../enum/request-method.enum";
 import {RuntimeError} from "../../application/error/runtime.error";
 import {SecureRequest} from "../../auth/interface/secure-request.interface";
 import {PermissionService} from "../../auth/service/permission.service";
-import {AbstractUser, DataFileService, Enemene, FileController} from "../../../..";
+import {AbstractUser, DataFileService, Enemene} from "../../../..";
 import {InputValidationError} from "../../validation/error/input-validation.error";
 import {Redirect} from "../class/redirect.class";
 import {ConstructorOf} from "../../../../base/constructor-of";
 import {AbstractController} from "../class/abstract-controller.class";
 import {CustomResponse} from "../class/custom-response.class";
 import {IntegrityViolationError} from "../../error/integrity-violation.error";
-import AuthController from "../../auth/auth.controller";
-import ActionController from "../../action/action.controller";
-import ViewGetController from "../../view/view-get.controller";
-import ViewPostController from "../../view/view-post.controller";
-import ViewPutController from "../../view/view-put.controller";
-import ViewDeleteController from "../../view/view-delete.controller";
-import {ModelController} from "../../model/model.controller";
 import {FileService} from "../../file/service/file.service";
 import multer from "multer";
 import {ValidationFieldError} from "../../validation/interface/validation-field-error.interface";
@@ -32,7 +25,6 @@ import {PopulatorController} from "../../dev/dev.controller";
 import path from "path";
 import {RequestContext} from "../interface/request-context.interface";
 import * as fs from "fs";
-import {DocumentController} from "../../document/document.controller";
 import {FileResponse} from "../class/file-response.class";
 
 export class RouterService {
@@ -48,7 +40,7 @@ export class RouterService {
 
     private multer;
 
-    async init(): Promise<void> {
+    async init(systemControllers: ConstructorOf<AbstractController>[]): Promise<void> {
         this.multer = multer({dest: path.join(process.cwd(), "tmpfiles")});
         const controllerFiles: string[] = this.fileService.scanForFilePattern(Enemene.app.config.modulesPath, /.*\.controller\.js/);
         const controllerModules: Dictionary<ConstructorOf<AbstractController>>[] = await Promise.all(controllerFiles.map((filePath: string) => import(filePath)));
@@ -60,16 +52,6 @@ export class RouterService {
             });
         });
 
-        const systemControllers: ConstructorOf<AbstractController>[] = [AuthController,
-            ActionController,
-            DocumentController,
-            FileController,
-            ViewGetController,
-            ViewPostController,
-            ViewPutController,
-            ViewDeleteController,
-            ModelController,
-        ];
         if (Enemene.app.devMode) {
             systemControllers.push(PopulatorController);
         }
@@ -185,7 +167,6 @@ export class RouterService {
         } else {
             return res.status(statusCode).send(new RuntimeError(err.message).toJSON());
         }
-
     }
 
     private async handle(req: SecureRequest, res: Response, next: Function, pathDefinition: PathDefinition): Promise<void> {

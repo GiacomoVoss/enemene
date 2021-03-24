@@ -2,6 +2,7 @@ import {AbstractUser} from "./auth";
 import {ConstructorOf, uuid} from "./base";
 import {LogLevel, LogService} from "./log";
 import {Sequelize} from "sequelize";
+import {AbstractUserReadModel} from "./cqrs";
 
 /**
  * Enemene's main class.
@@ -145,7 +146,7 @@ export declare interface EnemeneConfig {
     /**
      * The model used as a User identification.
      */
-    userModel: typeof AbstractUser;
+    userModel: ConstructorOf<AbstractUser | AbstractUserReadModel>;
 
     /**
      * The supported languages as an array of strings, ordered by usage priority.

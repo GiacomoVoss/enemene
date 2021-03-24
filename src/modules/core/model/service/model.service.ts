@@ -82,17 +82,10 @@ export class ModelService {
         }
     }
 
-    public async init(app: Enemene) {
+    public async init(app: Enemene, systemModelImports: Promise<any>[]) {
         const db = app.db;
         await db.authenticate();
-        const systemModels = await Promise.all([
-            import("../../view/model/view-object.model"),
-            import("../../auth/model/role.model"),
-            import("../../auth/model/route-permission.model"),
-            import("../../auth/model/view-permission.model"),
-            import("../../file/model/file.model"),
-            import("../../migration/model/migration.model"),
-        ]);
+        const systemModels = await Promise.all(systemModelImports);
         const modelFiles: string[] = app.inject(FileService).scanForFilePattern(app.config.modulesPath, /.*\.model\.js/);
         const modules: any[] = await Promise.all(modelFiles.map((filePath: string) => import(filePath)));
 

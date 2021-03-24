@@ -1,5 +1,3 @@
-import {Dictionary} from "../../../../base/type/dictionary.type";
-import {serializable} from "../../../../base/type/serializable.type";
 import {AbstractValidate} from "./abstract-validate.class";
 import {ValidationResult} from "../type/validation-result.type";
 import {get, isEqual} from "lodash";
@@ -11,7 +9,7 @@ export class ValidateEquals extends AbstractValidate {
         super();
     }
 
-    public evaluate(object: Dictionary<serializable>): ValidationResult {
+    public evaluate(object: any): ValidationResult {
         const value: any = get(object, this.field, undefined);
         if (isEqual(this.value, value)) {
             return true;

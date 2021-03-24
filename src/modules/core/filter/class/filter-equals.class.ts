@@ -1,7 +1,6 @@
 import {IncludeOptions, WhereAttributeHash, WhereOptions} from "sequelize/types/lib/model";
 import {serializable} from "../../../../base/type/serializable.type";
 import {get} from "lodash";
-import {Dictionary} from "../../../../base/type/dictionary.type";
 import {AbstractFilter} from "./abstract-filter.class";
 
 export class FilterEquals extends AbstractFilter {
@@ -18,7 +17,7 @@ export class FilterEquals extends AbstractFilter {
         }
     }
 
-    public evaluate(object: Dictionary<serializable>): boolean {
+    public evaluate(object: any): boolean {
         const value: serializable = get(object, this.field);
         return value === this.value;
     }

@@ -26,6 +26,6 @@ export class PopulatorController extends AbstractController {
             logging: (sql: string) => Enemene.log.debug(this.constructor.name, sql),
         });
 
-        await this.modelService.init(Enemene.app);
+        await this.modelService.init(Enemene.app, Enemene.systemModels);
     }
 }
