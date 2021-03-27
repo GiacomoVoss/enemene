@@ -42,7 +42,7 @@ export declare class Enemene {
     /**
      * Start the application.
      */
-    public start(): void;
+    public start(): Promise<void>;
 
     /**
      * Drops and recreates the database and imports new data based on the provided yaml fixtures.

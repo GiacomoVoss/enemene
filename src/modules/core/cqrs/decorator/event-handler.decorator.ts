@@ -3,17 +3,18 @@ import {ReadModel} from "../class/read-model.class";
 import {EventHandlerDefinition} from "../interface/event-handler-definition.interface";
 import {AbstractEvent} from "../class/abstract-event.class";
 import {uuid} from "../../../../base/type/uuid.type";
+import {Dictionary} from "../../../../base/type/dictionary.type";
 
-export function EventHandler<T extends AbstractEvent>(eventType: ConstructorOf<T>, global: boolean = false, idExtractor?: (event: T) => uuid): Function {
+export function EventHandler<T extends AbstractEvent>(eventType: ConstructorOf<T>, idExtractorOrGlobal?: ((event: T) => uuid) | true): Function {
     return function (target: ConstructorOf<ReadModel>, key: string, descriptor: PropertyDescriptor): void {
-        const handlers: EventHandlerDefinition[] = target.constructor.prototype.$eventHandlers || [];
+        const handlers: Dictionary<EventHandlerDefinition> = target.constructor.prototype.$eventHandlers || {};
 
-        handlers.push({
+        handlers[eventType.name] = {
             eventTypeName: eventType.name,
             handler: descriptor.value,
-            global,
-            idExtractor,
-        });
+            global: typeof idExtractorOrGlobal === "boolean" && idExtractorOrGlobal === true,
+            idExtractor: !!idExtractorOrGlobal && typeof idExtractorOrGlobal === "function" ? idExtractorOrGlobal : undefined,
+        };
 
         target.constructor.prototype.$eventHandlers = handlers;
     };

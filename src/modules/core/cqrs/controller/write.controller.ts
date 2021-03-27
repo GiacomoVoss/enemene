@@ -13,11 +13,12 @@ export class WriteController extends AbstractController {
     private commandRegistry: CommandRegistryService = Enemene.app.inject(CommandRegistryService);
     private commandBus: CommandBus = Enemene.app.inject(CommandBus);
 
-    @Put("/:command/:id", true)
+    @Put("/:command/:id/:version", true)
     async handle(@Path("id") aggregateId: string,
+                 @Path("version") aggregateVersionString: string,
                  @Path("command") commandEndpoint: string,
                  @Context context: RequestContext<AbstractUser>,
                  @Body() body: Dictionary<serializable>) {
-        await this.commandBus.executeCommand(this.commandRegistry.createCommand(commandEndpoint, body), aggregateId);
+        await this.commandBus.executeCommand(this.commandRegistry.createCommand(commandEndpoint, body), aggregateId, parseInt(aggregateVersionString));
     }
 }

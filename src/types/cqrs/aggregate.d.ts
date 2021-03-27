@@ -1,4 +1,6 @@
 import {uuid} from "../../base/type/uuid.type";
+import {ConstructorOf} from "../../base/constructor-of";
+import {AbstractCommand} from "./command";
 
 export abstract class Aggregate {
     public id: uuid;
@@ -9,3 +11,5 @@ export abstract class Aggregate {
                 version?: number,
                 deleted?: boolean);
 }
+
+export declare function CommandHandler(commandType: ConstructorOf<AbstractCommand>): Function;

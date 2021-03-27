@@ -24,9 +24,9 @@ export class ReadController extends AbstractController {
 
     @Get("/:endpoint", true)
     async getList(@Path("endpoint") endpoint: string,
-                  @Query("path") path: string,
+                  @Query("fields") fields: string,
                   @Context context: RequestContext<AbstractUserReadModel>) {
         const readModelClass: ConstructorOf<ReadModel> | undefined = this.readModelRegistry.getReadModelForEndpoint(endpoint);
-        return this.readModelRepository.getObjectsWithPermissions(readModelClass, context, path);
+        return this.readModelRepository.getObjectsWithPermissions(readModelClass, context, fields);
     }
 }

@@ -13,12 +13,30 @@ import {ValidationNotError} from "../class/validate-not.class";
 import {ValidationOrError} from "../class/validate-or.class";
 import {View} from "../../view";
 import {RequestContext} from "../../router/interface/request-context.interface";
-import {AbstractUser} from "../../auth";
+import {AbstractUser, AbstractUserReadModel} from "../../auth";
+import {AbstractCommand} from "../../cqrs";
 
 export class ValidationService {
 
     public validateView<ENTITY extends DataObject<ENTITY>>(view: View<ENTITY>, context: RequestContext<AbstractUser>): void {
         this.validate(view.toJSON(), view.$view.entity.name, context.language, view.$view.getValidation());
+    }
+
+    public validateCommand<COMMAND extends AbstractCommand>(command: COMMAND, context?: RequestContext<AbstractUserReadModel>): void {
+        let result: ValidationResult;
+
+        if (command.$validation) {
+            result = command.$validation.evaluate(command);
+        } else {
+            result = true;
+        }
+
+        if (result !== true) {
+            if (!Array.isArray(result)) {
+                result = [result];
+            }
+            throw new InputValidationError(result as ValidationError[], command.$endpoint, context?.language ?? "en");
+        }
     }
 
     public validate<ENTITY extends DataObject<ENTITY>>(object: Dictionary<serializable>, entity: string, language: string, validation?: AbstractValidate): void {

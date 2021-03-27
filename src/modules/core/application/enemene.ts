@@ -103,7 +103,7 @@ export class Enemene {
         await new DbImport(app.db, fixturesPaths).resetAndImportDb();
     }
 
-    public start(): void {
+    public async start(): Promise<void> {
         if (this.config.ssl) {
             this.express.use((req: Request, res: Response, next: NextFunction) => {
                 if (req.secure) {

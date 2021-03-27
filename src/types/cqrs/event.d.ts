@@ -1,7 +1,8 @@
 import {ConstructorOf, uuid} from "../base";
 import {DataObject} from "../model";
 
-export function EventHandler(eventType: ConstructorOf<AbstractEvent>, global?: boolean): Function;
+export declare function EventHandler<T extends AbstractEvent>(eventType: ConstructorOf<T>, idExtractor?: (event: T) => uuid): Function;
+export declare function EventHandler<T extends AbstractEvent>(eventType: ConstructorOf<T>, global?: true): Function;
 
 export class AbstractEvent {
 }

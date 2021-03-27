@@ -21,4 +21,6 @@ export declare class Validate {
     public static equals(field: string, value: serializable): AbstractValidate;
 
     public static exists(field: string): AbstractValidate;
+
+    public static requiredFields(...fields: string[]): AbstractValidate;
 }

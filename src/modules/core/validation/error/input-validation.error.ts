@@ -9,7 +9,7 @@ export class InputValidationError extends RuntimeError {
     constructor(protected details: ValidationError[],
                 private entity: string,
                 private language: string) {
-        super(`Validation failed.`);
+        super(`Validation failed. (${entity}: ${JSON.stringify(details)})`);
     }
 
     toJSON(): object {

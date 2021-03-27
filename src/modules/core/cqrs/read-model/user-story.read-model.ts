@@ -32,7 +32,7 @@ export class UserStory extends ReadModel {
         this.deleted = true;
     }
 
-    @EventHandler(UserStoryReadPermissionAddedV1Event, false, event => event.userStoryId)
+    @EventHandler(UserStoryReadPermissionAddedV1Event, event => event.userStoryId)
     handleReadPermissionCreated(event: UserStoryReadPermissionAddedV1Event, metadata: EventMetadata) {
         const newReadPermission: ReadPermission = {
             id: event.permissionId,
@@ -44,7 +44,7 @@ export class UserStory extends ReadModel {
         this.readModelPermissions.push(newReadPermission);
     }
 
-    @EventHandler(UserStoryReadPermissionRemovedV1Event, false, event => event.userStoryId)
+    @EventHandler(UserStoryReadPermissionRemovedV1Event, event => event.userStoryId)
     handleReadPermissionDeleted(event: UserStoryReadPermissionRemovedV1Event, metadata: EventMetadata) {
         this.readModelPermissions.filter(p => p.id !== metadata.aggregateId);
     }

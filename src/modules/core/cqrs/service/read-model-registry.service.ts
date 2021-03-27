@@ -3,7 +3,6 @@ import {Dictionary} from "../../../../base/type/dictionary.type";
 import {ConstructorOf} from "../../../../base/constructor-of";
 import {FileService} from "../../file/service/file.service";
 import {ReadModel} from "../class/read-model.class";
-import {EventHandlerDefinition} from "../interface/event-handler-definition.interface";
 import chalk from "chalk";
 import {ObjectNotFoundError} from "../../error";
 
@@ -31,11 +30,11 @@ export class ReadModelRegistryService {
                     Enemene.log.debug(this.constructor.name, `Registering public read model endpoint ${chalk.bold(endpoint)}`);
                 }
                 if (readModel.prototype.$eventHandlers) {
-                    readModel.prototype.$eventHandlers.forEach((handler: EventHandlerDefinition) => {
-                        if (!this.eventToReadModelMap[handler.eventTypeName]) {
-                            this.eventToReadModelMap[handler.eventTypeName] = [];
+                    Object.keys(readModel.prototype.$eventHandlers).forEach(eventTypeName => {
+                        if (!this.eventToReadModelMap[eventTypeName]) {
+                            this.eventToReadModelMap[eventTypeName] = [];
                         }
-                        this.eventToReadModelMap[handler.eventTypeName].push(readModel.name);
+                        this.eventToReadModelMap[eventTypeName].push(readModel.name);
                     });
                 }
             });

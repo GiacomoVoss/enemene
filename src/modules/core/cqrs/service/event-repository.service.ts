@@ -1,17 +1,35 @@
 import {Event} from "../entity/event.model";
 import {uuid} from "../../../../base/type/uuid.type";
 import {AbstractEvent} from "../class/abstract-event.class";
-import {UuidService} from "../../service/uuid.service";
-import {Enemene} from "../../application";
+import {Enemene, EnemeneCqrs} from "../../application";
+import {Subject} from "rxjs";
+import {ReadModelRepositoryService} from "./read-model-repository.service";
 import {Transaction} from "sequelize";
+import {UuidService} from "../../service/uuid.service";
+import {EventRegistryService} from "./event-registry.service";
 
 export class EventRepositoryService {
 
+    private eventRegistry: EventRegistryService = EnemeneCqrs.app.inject(EventRegistryService);
+
     latestPosition: number = 0;
+    public queue = new Subject<Event>();
+
+    public async startEventListener(): Promise<void> {
+        const repository = Enemene.app.inject(ReadModelRepositoryService);
+        this.queue.subscribe({
+            next: event => repository.handleEvent(this.eventRegistry.parseEvent(event), event)
+        });
+        const events: Event[] = await this.getAllEventsUntilNow();
+        events.forEach(event => this.queue.next(event));
+    }
 
     public async getAllEventsUntilNow(): Promise<Event[]> {
         return Event.findAll({
             order: [["position", "ASC"]],
+        }).then(events => {
+            this.latestPosition = events.length - 1;
+            return events;
         });
     }
 
@@ -29,18 +47,24 @@ export class EventRepositoryService {
             type: Transaction.TYPES.IMMEDIATE,
         });
         let position: number = this.latestPosition;
-        await Event.bulkCreate(events.map((event: AbstractEvent) => {
+        const eventsToPersist: Event[] = events.map((event: AbstractEvent) => {
             position++;
-            return {
+            return Event.build({
                 position,
                 id: UuidService.getUuid(),
                 eventType: event.constructor.name,
                 aggregateId,
                 data: event,
-            };
-        }), {
-            transaction,
+            });
         });
+        eventsToPersist.forEach(this.queue.next);
+        try {
+            await Event.bulkCreate(eventsToPersist, {
+                transaction,
+            });
+        } catch (e) {
+            console.log(e);
+        }
 
         await transaction.commit();
         this.latestPosition = position;

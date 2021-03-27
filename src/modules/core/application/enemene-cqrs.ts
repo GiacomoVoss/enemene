@@ -6,7 +6,7 @@ import {FileController} from "../file/file.controller";
 import {DataTypes, Sequelize} from "sequelize";
 import {WriteController} from "../cqrs/controller/write.controller";
 import {LogService} from "../log/service/log.service";
-import {AggregateRegistryService, Event, ReadController, ReadModelRepositoryService} from "../cqrs";
+import {AggregateRegistryService, Event, EventRepositoryService, ReadController, ReadModelRepositoryService} from "../cqrs";
 import {ReadModelRegistryService} from "../cqrs/service/read-model-registry.service";
 import {EventRegistryService} from "../cqrs/service/event-registry.service";
 import {CommandRegistryService} from "../cqrs/service/command-registry.service";
@@ -76,6 +76,11 @@ export class EnemeneCqrs extends Enemene {
             tableName: "event",
             updatedAt: false,
         });
+    }
+
+    public async start(): Promise<void> {
+        await super.start();
+        this.inject(EventRepositoryService).startEventListener();
     }
 
     public async setup(): Promise<void> {

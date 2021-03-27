@@ -5,9 +5,10 @@ import {serializable} from "../../../../base/type/serializable.type";
 
 export abstract class ReadModel {
     $endpoint: string;
-    $eventHandlers: EventHandlerDefinition[];
+    $eventHandlers: Dictionary<EventHandlerDefinition>;
 
     constructor(public id: uuid,
+                public version: number = 0,
                 public deleted: boolean = false) {
     }
 

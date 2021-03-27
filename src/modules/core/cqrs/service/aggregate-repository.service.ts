@@ -27,7 +27,10 @@ export class AggregateRepositoryService {
 
     public handleEvent(aggregate: Aggregate, metadata: Event) {
         const event: AbstractEvent = this.eventRegistry.parseEvent(metadata);
-        const handler: EventHandlerDefinition = aggregate.$eventHandlers.find(h => h.eventTypeName === metadata.eventType);
-        handler.handler.apply(aggregate, [event, metadata]);
+        const handler: EventHandlerDefinition = aggregate.$eventHandlers[metadata.eventType];
+        if (handler) {
+            handler.handler.apply(aggregate, [event, metadata]);
+            aggregate.version = aggregate.version + 1;
+        }
     }
 }

@@ -23,6 +23,7 @@ export class CommandRegistryService {
                     throw new Error("Duplicate command endpoint: " + endpoint);
                 }
                 this.commands[new command().$endpoint] = command;
+                console.log(command.prototype.$parameters);
             });
         });
     }
@@ -31,7 +32,6 @@ export class CommandRegistryService {
         const commandClass: ConstructorOf<AbstractCommand> = this.commands[commandEndpoint];
         const command: AbstractCommand = new commandClass();
         command.populate(data);
-        command.validate();
         return command;
     }
 }
