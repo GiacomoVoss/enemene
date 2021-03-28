@@ -222,8 +222,8 @@ export class ModelService {
                                     field: foreignKey,
                                 };
                                 options.otherKey = {
-                                    name: `${camelCase(entityField.classGetter().name)}Id`,
-                                    field: `${camelCase(entityField.classGetter().name)}Id`,
+                                    name: lowerFirst(`${camelCase(entityField.classGetter().name)}Id`),
+                                    field: lowerFirst(`${camelCase(entityField.classGetter().name)}Id`),
                                 };
                                 through = db.define(throughModelName, attributes, {
                                     tableName: snakeCase(throughModelName),

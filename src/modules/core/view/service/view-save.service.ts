@@ -18,13 +18,11 @@ import {UuidService} from "../../service/uuid.service";
 import {ViewFieldDefinition} from "../class/view-field-definition.class";
 import {serializable} from "../../../../base/type/serializable.type";
 import {ViewHelperService} from "./view-helper.service";
-import {ViewFindService} from "./view-find.service";
 
 export class ViewSaveService {
 
     private validationService: ValidationService = Enemene.app.inject(ValidationService);
     private viewHelperService: ViewHelperService = Enemene.app.inject(ViewHelperService);
-    private viewFindService: ViewFindService = Enemene.app.inject(ViewFindService);
     private permissionService: PermissionService = Enemene.app.inject(PermissionService);
 
     public async save<ENTITY extends DataObject<ENTITY>>(view: View<ENTITY>,

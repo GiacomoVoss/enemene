@@ -51,6 +51,9 @@ export abstract class View<ENTITY extends DataObject<ENTITY>> {
                 }
             }
         }
+        if (data.id) {
+            this.isNew = false;
+        }
         this.id = (data.id as string | undefined) ?? this.id;
     }
 
@@ -95,7 +98,7 @@ export abstract class View<ENTITY extends DataObject<ENTITY>> {
             id: this.id,
             $entity: this.$view.entity.name,
             $displayPattern: this.$displayPattern,
-            ...pick(this, fields),
+            ...pick(this, ...fields),
         };
     }
 }

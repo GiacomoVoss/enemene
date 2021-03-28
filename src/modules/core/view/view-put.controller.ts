@@ -21,7 +21,6 @@ export default class ViewPutController extends AbstractViewController {
         const viewDefinition: ViewDefinition<ENTITY> = this.getViewDefinition(viewName);
         const view: View<ENTITY> = await this.viewService.findById(viewDefinition.viewClass, objectId, context);
         view.setValues(data, context);
-
         return {
             data: await this.viewService.save(view, context),
             model: viewDefinition.getModel(context),
