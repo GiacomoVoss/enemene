@@ -1,6 +1,6 @@
-import {RuntimeError} from "../application/error/runtime.error";
+import {UserInputValidationError} from "../cqrs/error/user-input-validation.error";
 
-export class ObjectNotFoundError extends RuntimeError {
+export class ObjectNotFoundError extends UserInputValidationError {
 
     statusCode: number = 404;
     type: string = "ObjectNotFoundError";

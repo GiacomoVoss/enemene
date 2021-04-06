@@ -12,19 +12,98 @@ import {RequestContext} from "../../router/interface/request-context.interface";
 import {AbstractUserReadModel} from "../../auth";
 import {SemanticCommandType} from "../enum/semantic-command-type.enum";
 import {UserInputValidationError} from "../error/user-input-validation.error";
+import {PermissionCqrsService} from "../../auth/service/permission-cqrs.service";
+import {ObjectRepositoryService} from "./object-repository.service";
+import {Observable, Subject} from "rxjs";
+import {CommandQueueEntry} from "../interface/command-queue-entry.interface";
+import {concatMap} from "rxjs/operators";
+import {fromPromise} from "rxjs/internal-compatibility";
+import {uuid} from "../../../../base/type/uuid.type";
+import {Dictionary} from "../../../../base/type/dictionary.type";
+import {CommandResult} from "../interface/command-result.interface";
 
 export class CommandBus {
 
     private aggregateRepository: AggregateRepositoryService = EnemeneCqrs.app.inject(AggregateRepositoryService);
+    private permissionCqrsService: PermissionCqrsService = EnemeneCqrs.app.inject(PermissionCqrsService);
     private eventRepository: EventRepositoryService = EnemeneCqrs.app.inject(EventRepositoryService);
     private validationService: ValidationService = EnemeneCqrs.app.inject(ValidationService);
+    private objectRepository: ObjectRepositoryService = EnemeneCqrs.app.inject(ObjectRepositoryService);
 
-    async executeCommand(command: AbstractCommand, aggregateId: string, aggregateVersion?: number, context?: RequestContext<AbstractUserReadModel>): Promise<void> {
-        this.validationService.validateCommand(command, context);
-        const aggregate: Aggregate = await this.aggregateRepository.getAggregateForCommand(command.$endpoint, aggregateId);
-        if (!aggregate) {
+    public asyncResults: Dictionary<any> = {};
+
+    private commandQueue: Subject<CommandQueueEntry> = new Subject();
+
+    constructor() {
+        this.commandQueue
+            .pipe(concatMap(entry => fromPromise(this.executeCommandFromQueue(entry))))
+            .subscribe();
+    }
+
+    public executeCommand(command: AbstractCommand, aggregateId: string, version?: number, context?: RequestContext<AbstractUserReadModel>): Observable<any> {
+        EnemeneCqrs.log.silly(this.constructor.name, `Command: ${command.$endpoint} (${aggregateId})`);
+        const result: Subject<any> = new Subject();
+        this.commandQueue.next({
+            command,
+            aggregateId,
+            version,
+            context,
+            result,
+        });
+
+        return result;
+    }
+
+    private async executeCommandFromQueue(queueEntry: CommandQueueEntry): Promise<void> {
+        await this.executeCommandInternal(queueEntry);
+    }
+
+    private async executeCommandInternal({command, aggregateId, version, context, result}: CommandQueueEntry): Promise<any> {
+        try {
+            this.validateCommand(command, aggregateId, version, context);
+        } catch (e) {
+            result.error(e);
+            return;
+        }
+        const aggregate: Aggregate = this.aggregateRepository.getAggregateForCommand(command.$endpoint, aggregateId);
+        const commandHandler: CommandHandlerDefinition = aggregate.$commandHandlers.find(handler => handler.endpoint === command.$endpoint);
+        if (!commandHandler) {
             throw new UnsupportedOperationError("No command handler found: " + command.$endpoint);
         }
+
+        // Execute the command handler (which will not perform any changes on the aggregate itself but return the intended changes as events).
+        let commandResult: CommandResult = {};
+        let events: AbstractEvent | AbstractEvent[] | null;
+        try {
+            events = commandHandler.handler.apply(aggregate, [command, commandResult]);
+        } catch (e) {
+            result.error(e);
+            return;
+        }
+        const eventList: AbstractEvent[] = Array.isArray(events) ? events : [events];
+        if (commandResult.value) {
+            result.next(commandResult.value);
+        } else {
+            result.complete();
+        }
+
+        if (events == null) {
+            return;
+        }
+
+        const causationId: uuid = UuidService.getUuid();
+        await this.eventRepository.persistEvents(eventList, aggregateId, causationId, context?.currentUser?.id, aggregate.version);
+    }
+
+    private validateCommand(command: AbstractCommand, aggregateId: string, aggregateVersion?: number, context?: RequestContext<AbstractUserReadModel>): uuid | undefined {
+        this.validationService.validateCommand(command);
+        const aggregate: Aggregate = this.aggregateRepository.getAggregateForCommand(command.$endpoint, aggregateId);
+        const currentAggregateVersion: number = aggregate.version;
+
+        if (context) {
+            this.permissionCqrsService.checkCommandPermission(command.$endpoint, aggregate, context, this.objectRepository);
+        }
+
         const commandHandler: CommandHandlerDefinition = aggregate.$commandHandlers.find(handler => handler.endpoint === command.$endpoint);
         if (!commandHandler) {
             throw new UnsupportedOperationError("No command handler found: " + command.$endpoint);
@@ -32,40 +111,30 @@ export class CommandBus {
 
         if (command.$semanticType === SemanticCommandType.CREATE) {
             // Create command with wrong version number? => 400
-            if (aggregateVersion !== undefined && aggregateVersion != 0) {
+            if (currentAggregateVersion !== 0) {
                 throw new UserInputValidationError("Objects can only be created with version 0");
-            }
-
-            // CreateCommand on an already existing object? => 200
-            if (aggregate.version != 0) {
-                return;
             }
         } else {
             // Not a CreateCommand on a non existing object?
-            if (aggregate.version == 0) {
-                throw new ObjectNotFoundError();
+            if (currentAggregateVersion == 0) {
+                throw new ObjectNotFoundError(`${command.$endpoint}, ${aggregateId}`);
             }
 
             // Optimistic locking version number mismatch?
-            if (aggregateVersion !== undefined && aggregate.version != aggregateVersion) {
-                throw new UserInputValidationError("Optimistic locking error.");
-            }
+            // if (aggregateVersion !== undefined && aggregate.version != aggregateVersion) {
+            //     throw new UserInputValidationError("Optimistic locking error.");
+            // }
         }
 
-        // Execute the command handler (which will not perform any changes on the aggregate itself but return the intended
-        // changes as events).
-        let events: AbstractEvent | AbstractEvent[] | null = commandHandler.handler.apply(aggregate, [command]);
-        const eventList: AbstractEvent[] = Array.isArray(events) ? events : [events];
-
-        // Not a RestoreCommand on a deleted object?
-        if (eventList.length && aggregate.deleted && command.$semanticType !== SemanticCommandType.RESTORE) {
+        if (aggregate.deleted && command.$semanticType !== SemanticCommandType.RESTORE) {
+            // Not a RestoreCommand on a deleted object?
             throw new ObjectNotFoundError();
         }
 
-        if (events == null) {
-            return;
+        if (commandHandler.returnsAsyncResult) {
+            return UuidService.getUuid();
         }
 
-        await this.eventRepository.persistEvents(eventList, aggregateId, UuidService.getUuid());
+        return undefined;
     }
 }

@@ -9,6 +9,6 @@ export class CreateUserStoryCommand extends AbstractCommand {
     $endpoint = "userStory.create";
 
     constructor(public name: string) {
-        super(Validate.requiredFields("name"));
+        super(Validate.commandInput({name: "User story name"}));
     }
 }

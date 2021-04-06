@@ -1,32 +1,46 @@
 import {RequestContext} from "../../router/interface/request-context.interface";
 import {Enemene} from "../../application";
 import {AbstractController, Context, Controller, Get, Path, Query} from "../../router";
-import {ReadModelRepositoryService} from "../service/read-model-repository.service";
 import {ReadModel} from "../class/read-model.class";
 import {ConstructorOf} from "../../../../base/constructor-of";
 import {ReadModelRegistryService} from "../service/read-model-registry.service";
 import {AbstractUserReadModel} from "../../auth/interface/abstract-user-read-model.interface";
+import {ObjectRepositoryService} from "../service/object-repository.service";
 
 @Controller("read")
 export class ReadController extends AbstractController {
 
-    private readModelRepository: ReadModelRepositoryService = Enemene.app.inject(ReadModelRepositoryService);
+    private objectRepository: ObjectRepositoryService = Enemene.app.inject(ObjectRepositoryService);
     private readModelRegistry: ReadModelRegistryService = Enemene.app.inject(ReadModelRegistryService);
 
     @Get("/:endpoint/:id", true)
     async getObject(@Path("endpoint") endpoint: string,
                     @Path("id") id: string,
-                    @Query("path") path: string,
+                    @Query("fields") fieldsString: string,
                     @Context context: RequestContext<AbstractUserReadModel>) {
         const readModelClass: ConstructorOf<ReadModel> | undefined = this.readModelRegistry.getReadModelForEndpoint(endpoint);
-        return this.readModelRepository.getObjectWithPermissions(readModelClass, id, context, path);
+        return this.objectRepository.getObjectWithPermissions(readModelClass, id, context, fieldsString);
     }
 
     @Get("/:endpoint", true)
     async getList(@Path("endpoint") endpoint: string,
                   @Query("fields") fields: string,
+                  @Query("limit") limitString: string,
+                  @Query("offset") offsetString: string,
+                  @Query("order") orderString: string,
+                  @Query("filter") filterString: string,
                   @Context context: RequestContext<AbstractUserReadModel>) {
         const readModelClass: ConstructorOf<ReadModel> | undefined = this.readModelRegistry.getReadModelForEndpoint(endpoint);
-        return this.readModelRepository.getObjectsWithPermissions(readModelClass, context, fields);
+        return this.objectRepository.getObjectsWithPermissions(readModelClass, context, ObjectRepositoryService.getObjectsQueryInput(fields, orderString, limitString, offsetString, filterString));
+    }
+
+    @Get("/count/:endpoint", true)
+    async count(@Path("endpoint") endpoint: string,
+                @Query("filter") filterString: string,
+                @Context context: RequestContext<AbstractUserReadModel>) {
+        const readModelClass: ConstructorOf<ReadModel> | undefined = this.readModelRegistry.getReadModelForEndpoint(endpoint);
+        return {
+            count: this.objectRepository.getObjectsWithPermissions(readModelClass, context, ObjectRepositoryService.getObjectsQueryInput(undefined, undefined, undefined, undefined, filterString)).length
+        };
     }
 }

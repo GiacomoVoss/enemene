@@ -8,7 +8,7 @@ import {ObjectNotFoundError} from "../../error";
 
 export class ReadModelRegistryService {
 
-    private readModelClasses: Dictionary<ConstructorOf<ReadModel>> = {};
+    public readModelClasses: Dictionary<ConstructorOf<ReadModel>> = {};
     private endpointToReadModelMap: Dictionary<ConstructorOf<ReadModel>> = {};
     private eventToReadModelMap: Dictionary<string[]> = {};
 

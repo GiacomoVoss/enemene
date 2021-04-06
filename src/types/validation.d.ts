@@ -1,4 +1,5 @@
 import {serializable} from "./base";
+import {Dictionary} from "../base/type/dictionary.type";
 
 export type ValidationResult = true | ValidationError[];
 
@@ -22,5 +23,5 @@ export declare class Validate {
 
     public static exists(field: string): AbstractValidate;
 
-    public static requiredFields(...fields: string[]): AbstractValidate;
+    public static commandInput(fields: Dictionary<string | string[]>): AbstractValidate;
 }

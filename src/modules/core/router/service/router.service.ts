@@ -186,6 +186,7 @@ export class RouterService {
             if (result instanceof Redirect) {
                 res.redirect(result.url);
             } else if (result instanceof CustomResponse) {
+                Object.entries(result.headers).forEach(([key, value]) => res.header(key, value));
                 res.status(result.status).send(result.data);
             } else if (result instanceof FileResponse) {
                 if (fs.existsSync(result.filePath)) {

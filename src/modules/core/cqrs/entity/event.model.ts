@@ -12,11 +12,11 @@ export class Event extends DataObject<Event> implements Event {
 
     data: any;
 
-    createdAt: string;
+    createdAt: Date;
 
     correlationId?: string;
 
     causationId?: string;
 
-    causedByPersonId?: string;
+    causedByUserId?: string;
 }

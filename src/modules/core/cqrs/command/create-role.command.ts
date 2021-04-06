@@ -9,6 +9,6 @@ export class CreateRoleCommand extends AbstractCommand {
     $endpoint = "role.create";
 
     constructor(public name: string) {
-        super(Validate.requiredFields("name"));
+        super(Validate.commandInput({name: "Role name"}));
     }
 }

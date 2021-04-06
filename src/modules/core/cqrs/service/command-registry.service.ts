@@ -23,7 +23,6 @@ export class CommandRegistryService {
                     throw new Error("Duplicate command endpoint: " + endpoint);
                 }
                 this.commands[new command().$endpoint] = command;
-                console.log(command.prototype.$parameters);
             });
         });
     }

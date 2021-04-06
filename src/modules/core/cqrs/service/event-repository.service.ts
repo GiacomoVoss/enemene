@@ -2,71 +2,146 @@ import {Event} from "../entity/event.model";
 import {uuid} from "../../../../base/type/uuid.type";
 import {AbstractEvent} from "../class/abstract-event.class";
 import {Enemene, EnemeneCqrs} from "../../application";
-import {Subject} from "rxjs";
+import {Observable, Subject} from "rxjs";
 import {ReadModelRepositoryService} from "./read-model-repository.service";
-import {Transaction} from "sequelize";
+import {Op, Transaction} from "sequelize";
 import {UuidService} from "../../service/uuid.service";
 import {EventRegistryService} from "./event-registry.service";
+import {Snapshot} from "../entity/snapshot.model";
+import {WhereOptions} from "sequelize/types/lib/model";
+import {ObjectRepositoryService} from "./object-repository.service";
+import {Dictionary} from "../../../../base/type/dictionary.type";
+import {serializable} from "../../../../base/type/serializable.type";
+import {AggregateRepositoryService} from "./aggregate-repository.service";
+import {ConstructorOf} from "../../../../base/constructor-of";
+import {filter, map} from "rxjs/operators";
 
 export class EventRepositoryService {
 
     private eventRegistry: EventRegistryService = EnemeneCqrs.app.inject(EventRegistryService);
+    private objectRepository: ObjectRepositoryService = EnemeneCqrs.app.inject(ObjectRepositoryService);
 
-    latestPosition: number = 0;
     public queue = new Subject<Event>();
 
+    private latestPosition: number = 0;
+
     public async startEventListener(): Promise<void> {
-        const repository = Enemene.app.inject(ReadModelRepositoryService);
+        const readModelRepository = Enemene.app.inject(ReadModelRepositoryService);
+        const aggregateRepository = Enemene.app.inject(AggregateRepositoryService);
         this.queue.subscribe({
-            next: event => repository.handleEvent(this.eventRegistry.parseEvent(event), event)
-        });
-        const events: Event[] = await this.getAllEventsUntilNow();
-        events.forEach(event => this.queue.next(event));
-    }
+            next: event => {
+                EnemeneCqrs.log.debug(this.constructor.name, `Event ${event.position}: ${event.eventType} (${event.aggregateId})`);
+                readModelRepository.handleEvent(this.eventRegistry.parseEvent(event), event);
+                aggregateRepository.handleEvent(this.eventRegistry.parseEvent(event), event);
 
-    public async getAllEventsUntilNow(): Promise<Event[]> {
-        return Event.findAll({
-            order: [["position", "ASC"]],
-        }).then(events => {
-            this.latestPosition = events.length - 1;
-            return events;
-        });
-    }
-
-    public async getAllEventsForAggregateId(id: uuid): Promise<Event[]> {
-        return Event.findAll({
-            order: [["position", "ASC"]],
-            where: {
-                aggregateId: id,
+                this.latestPosition = event.position;
+                if (event.position % 1000 === 0) {
+                    this.createSnapshot(event.position);
+                }
             }
         });
+
+        // Apply latest snapshot.
+        const latestSnapshot: Snapshot | null = await Snapshot.findOne({
+            order: [["position", "DESC"]],
+        });
+
+        if (latestSnapshot) {
+            EnemeneCqrs.log.info(this.constructor.name, `Rebuilding from Snapshot @ ${latestSnapshot.position}...`);
+            this.objectRepository.deserializeSnapshot(latestSnapshot.data);
+            this.latestPosition = latestSnapshot.position;
+        }
+
+        const events: Event[] = await this.getAllEventsFromPosition(this.latestPosition);
+        if (events.length) {
+            EnemeneCqrs.log.info(this.constructor.name, `Rebuilding from ${events.length} events...`);
+        }
+        events.forEach(event => {
+            readModelRepository.handleEvent(this.eventRegistry.parseEvent(event), event);
+            aggregateRepository.handleEvent(this.eventRegistry.parseEvent(event), event);
+            this.latestPosition = event.position;
+        });
+        this.createSnapshot(this.latestPosition);
     }
 
-    public async persistEvents(events: AbstractEvent[], aggregateId: uuid, causationId: uuid): Promise<void> {
-        const transaction: Transaction = await Enemene.app.db.transaction({
-            type: Transaction.TYPES.IMMEDIATE,
+    public listen(events: ConstructorOf<AbstractEvent>[], aggregateId?: uuid): Observable<[AbstractEvent, Event]> {
+        const eventTypes: string[] = events.map(e => e.name);
+        return this.queue
+            .pipe(filter(event => eventTypes.includes(event.eventType)))
+            .pipe(filter(event => aggregateId ? event.aggregateId === aggregateId : true))
+            .pipe(map(event => [this.eventRegistry.parseEvent(event), event]));
+    }
+
+    public async getAllEventsFromPosition(fromPosition?: number): Promise<Event[]> {
+        const where: WhereOptions = {};
+        if (fromPosition) {
+            where.position = {
+                [Op.gt]: fromPosition,
+            };
+        }
+        return Event.findAll({
+            order: [["position", "ASC"]],
+            where,
         });
-        let position: number = this.latestPosition;
+    }
+
+    public async getAllEventsForAggregateId(id: uuid, offset?: number, transaction?: Transaction): Promise<Event[]> {
+        const where: WhereOptions = {
+            aggregateId: id,
+        };
+        return Event.findAll({
+            order: [["position", "ASC"]],
+            offset: offset,
+            where,
+            transaction,
+        });
+    }
+
+    public async persistEvents(events: AbstractEvent[], aggregateId: uuid, causationId: uuid, causedByUserId: uuid, aggregateVersion: number): Promise<void> {
         const eventsToPersist: Event[] = events.map((event: AbstractEvent) => {
-            position++;
             return Event.build({
-                position,
                 id: UuidService.getUuid(),
                 eventType: event.constructor.name,
                 aggregateId,
+                causationId,
+                causedByUserId,
                 data: event,
             });
         });
-        eventsToPersist.forEach(this.queue.next);
+        const transaction: Transaction = await Enemene.app.db.transaction();
         try {
-            await Event.bulkCreate(eventsToPersist, {
-                transaction,
-            });
+            await Promise.all(eventsToPersist.map(async event => event.save({transaction})));
+            eventsToPersist.forEach(event => this.queue.next(event));
+            await transaction.commit();
+            this.latestPosition = eventsToPersist.pop().position;
         } catch (e) {
-            console.log(e);
+            await transaction.rollback();
+            throw e;
         }
+    }
 
-        await transaction.commit();
-        this.latestPosition = position;
+    private createSnapshot(position: number): void {
+        if (position) {
+            const id: uuid = UuidService.getUuid();
+            Snapshot.findOne({
+                where: {
+                    position: {
+                        [Op.gte]: position,
+                    }
+                }
+            }).then(result => {
+                if (!result) {
+                    EnemeneCqrs.log.debug(this.constructor.name, `Creating snapshot @ ${position}.`);
+                    const data: Dictionary<serializable> = this.objectRepository.serializeSnapshot();
+                    Snapshot.create({
+                        id,
+                        position: position,
+                        data,
+                    }).then(() => {
+                        Snapshot.sequelize.query(`DELETE FROM ${Snapshot.getTableName()} WHERE position < '${position}'`);
+                    });
+                }
+            });
+        }
     }
 }

@@ -38,19 +38,37 @@ export class DataFileService {
 
             const destination = fs.createWriteStream(filePath);
             return new Promise((resolve, reject) => {
-                https.get(url, res => {
-                    res.pipe(destination);
-                    destination.on("finish", () => {
-                        destination.close();
-                        if (!destination.bytesWritten) {
-                            reject("No bytes written.");
-                            return;
+                try {
+                    https.get(url, res => {
+                        if (!res) {
+                            return reject();
                         }
-                        Enemene.log.debug(this.constructor.name, `Saved ${filePath} (${fs.statSync(filePath).size} bytes)`);
-                        resolve(fileName);
-                        return;
-                    });
-                });
+                        if (res.aborted) {
+                            return reject();
+                        }
+                        res.pipe(destination);
+                        res.on("error", (e: Error) => {
+                            return reject(e);
+                        });
+                        destination.on("error", (e: Error) => {
+                            return reject(e);
+                        });
+                        destination.on("finish", () => {
+                            destination.close();
+                            if (!destination.bytesWritten) {
+                                reject("No bytes written.");
+                                return;
+                            }
+                            Enemene.log.debug(this.constructor.name, `Saved ${filePath} (${fs.statSync(filePath).size} bytes)`);
+                            resolve(fileName);
+                            return;
+                        });
+                    })
+                        .on("error", e => reject(e))
+                        .on("abort", e => reject(e));
+                } catch (e) {
+                    reject("Could not download file: " + e.message);
+                }
             });
         }
     }

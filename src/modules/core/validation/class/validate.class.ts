@@ -4,7 +4,8 @@ import {ValidateOr} from "./validate-or.class";
 import {ValidateNot} from "./validate-not.class";
 import {ValidateExists} from "./validate-exists.class";
 import {ValidateEquals} from "./validate-equals.class";
-import {ValidateRequiredFields} from "./validate-required-fields.class";
+import {ValidateCommandInput} from "./validate-command-input.class";
+import {Dictionary} from "../../../../base/type/dictionary.type";
 
 export class Validate {
 
@@ -28,7 +29,7 @@ export class Validate {
         return new ValidateExists(field);
     }
 
-    public static requiredFields(...fields: string[]): AbstractValidate {
-        return new ValidateRequiredFields(fields);
+    public static commandInput(fields: Dictionary<string | string[]>): AbstractValidate {
+        return new ValidateCommandInput(fields);
     }
 }

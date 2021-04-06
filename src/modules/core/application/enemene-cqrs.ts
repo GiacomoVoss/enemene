@@ -3,8 +3,8 @@ import {Enemene} from "./enemene";
 import {RouterService} from "../router/service/router.service";
 import {DocumentController} from "../document/document.controller";
 import {FileController} from "../file/file.controller";
-import {DataTypes, Sequelize} from "sequelize";
-import {WriteController} from "../cqrs/controller/write.controller";
+import {DataTypes, Model} from "sequelize";
+import {CommandController} from "../cqrs/controller/command.controller";
 import {LogService} from "../log/service/log.service";
 import {AggregateRegistryService, Event, EventRepositoryService, ReadController, ReadModelRepositoryService} from "../cqrs";
 import {ReadModelRegistryService} from "../cqrs/service/read-model-registry.service";
@@ -14,6 +14,7 @@ import {AuthService} from "../auth/service/auth.service";
 import {ConstructorOf} from "../../../base/constructor-of";
 import {AbstractUserReadModel} from "../auth/interface/abstract-user-read-model.interface";
 import AuthCqrsController from "../auth/auth-cqrs.controller";
+import {Snapshot} from "../cqrs/entity/snapshot.model";
 
 require("express-async-errors");
 
@@ -32,16 +33,14 @@ export class EnemeneCqrs extends Enemene {
     }
 
     protected initializeDatabase(config: EnemeneConfig): void {
-        this.db = new Sequelize("sqlite::memory:", {
-            dialectOptions: {},
-            logging: sql => Enemene.log.silly("Database", sql),
-        });
+        super.initializeDatabase(config);
         Event.init({
             position: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
                 unique: true,
                 primaryKey: true,
+                autoIncrement: true,
             },
             id: {
                 type: DataTypes.STRING(36),
@@ -55,7 +54,7 @@ export class EnemeneCqrs extends Enemene {
             causation_id: {
                 type: DataTypes.STRING(36),
             },
-            caused_by_person_id: {
+            caused_by_user_id: {
                 type: DataTypes.STRING(36),
             },
             eventType: {
@@ -69,6 +68,19 @@ export class EnemeneCqrs extends Enemene {
             data: {
                 type: DataTypes.JSON,
                 allowNull: true,
+                get: function (this: Model) {
+                    const value = this.getDataValue("data") as any;
+                    if (value === undefined || value === null) {
+                        return value;
+                    }
+                    if (typeof value === "string") {
+                        return JSON.parse(value);
+                    }
+                    return value;
+                },
+                set: function (this: Model, value: string) {
+                    this.setDataValue("data", value as any);
+                }
             }
         }, {
             sequelize: this.db,
@@ -76,11 +88,46 @@ export class EnemeneCqrs extends Enemene {
             tableName: "event",
             updatedAt: false,
         });
+
+        Snapshot.init({
+            id: {
+                type: DataTypes.STRING(36),
+                allowNull: false,
+                unique: true,
+                primaryKey: true,
+            },
+            position: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+            },
+            data: {
+                type: DataTypes.JSON,
+                allowNull: true,
+                get: function (this: Model) {
+                    const value = this.getDataValue("data") as any;
+                    if (value === undefined || value === null) {
+                        return value;
+                    }
+                    if (typeof value === "string") {
+                        return JSON.parse(value);
+                    }
+                    return value;
+                },
+                set: function (this: Model, value: string) {
+                    this.setDataValue("data", value as any);
+                }
+            }
+        }, {
+            sequelize: this.db,
+            modelName: "Snapshot",
+            tableName: "snapshot",
+            updatedAt: false,
+        });
     }
 
     public async start(): Promise<void> {
+        await this.inject(EventRepositoryService).startEventListener();
         await super.start();
-        this.inject(EventRepositoryService).startEventListener();
     }
 
     public async setup(): Promise<void> {
@@ -101,7 +148,7 @@ export class EnemeneCqrs extends Enemene {
         await this.setupControllers([
             AuthCqrsController,
             ReadController,
-            WriteController,
+            CommandController,
             DocumentController,
             FileController,
         ]);

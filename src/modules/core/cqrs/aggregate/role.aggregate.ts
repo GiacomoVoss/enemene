@@ -1,12 +1,13 @@
 import {Aggregate} from "../class/aggregate.class";
 import {CommandHandler} from "../decorator/command-handler.decorator";
 import {CreateRoleCommand} from "../command/create-role.command";
-import {RoleCreatedV1Event, RoleDeletedV1Event, UserStoryAssignedToRoleV1Event, UserStoryDeletedV1Event, UserStoryUnassignedFromRoleV1Event} from "../event";
+import {RoleCreatedV1Event, RoleDeletedV1Event, RoleUpdatedV1Event, UserStoryAssignedToRoleV1Event, UserStoryDeletedV1Event, UserStoryUnassignedFromRoleV1Event} from "../event";
 import {DeleteRoleCommand} from "../command/delete-role.command";
 import {EventHandler} from "../decorator/event-handler.decorator";
 import {AssignUserStoryToRoleCommand} from "../command/assign-user-story-to-role.command";
 import {UnassignUserStoryFromRoleCommand} from "../command";
 import {EventMetadata} from "../interface/event-metadata.interface";
+import {UpdateRoleCommand} from "../command/update-role.command";
 
 export class RoleAggregate extends Aggregate {
 
@@ -32,6 +33,20 @@ export class RoleAggregate extends Aggregate {
     @EventHandler(RoleDeletedV1Event)
     handleDelete() {
         this.deleted = true;
+    }
+
+    @CommandHandler(UpdateRoleCommand)
+    update(command: UpdateRoleCommand) {
+        if (this.name === command.name) {
+            return null;
+        }
+
+        return new RoleUpdatedV1Event(command.name);
+    }
+    
+    @EventHandler(RoleUpdatedV1Event)
+    handleUpdated(event: RoleUpdatedV1Event) {
+        this.name = event.name;
     }
 
     @CommandHandler(AssignUserStoryToRoleCommand)

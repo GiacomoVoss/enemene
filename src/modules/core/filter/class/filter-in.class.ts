@@ -20,4 +20,8 @@ export class FilterIn extends AbstractFilter {
         }
         return this.values.includes(value);
     }
+
+    public toString(): string {
+        return `${this.field} in (${this.values})`;
+    }
 }

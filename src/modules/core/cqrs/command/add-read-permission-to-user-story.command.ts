@@ -11,6 +11,6 @@ export class AddReadPermissionToUserStoryCommand extends AbstractCommand {
                 public readModel: string,
                 public fields?: ReadModelFieldPermissions,
                 public filter?: string) {
-        super(Validate.requiredFields("id", "readModel"));
+        super(Validate.commandInput({id: "Read permission ID", readModel: "Read model name"}));
     }
 }

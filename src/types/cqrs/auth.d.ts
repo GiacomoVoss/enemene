@@ -31,6 +31,15 @@ export declare class CreateRoleCommand extends AbstractCommand {
     constructor(name: string);
 }
 
+export declare class UpdateRoleCommand extends AbstractCommand {
+
+    $endpoint: "role.update";
+
+    public name: string;
+
+    constructor(name: string);
+}
+
 export declare class DeleteRoleCommand extends AbstractCommand {
 
     $endpoint: "role.delete";
@@ -71,7 +80,7 @@ export declare class UnassignUserStoryFromRoleCommand extends AbstractCommand {
 
 export declare class AddReadPermissionToUserStoryCommand extends AbstractCommand {
 
-    $endpoint: "userStory.readPermission.create";
+    $endpoint: "userStory.readPermission.add";
 
     public id: uuid;
     public readModel: string;
@@ -87,6 +96,29 @@ export declare class AddReadPermissionToUserStoryCommand extends AbstractCommand
 export declare class RemoveReadPermissionFromUserStoryCommand extends AbstractCommand {
 
     $endpoint: "readPermission.delete";
+
+    public permissionId: uuid;
+
+    constructor(permissionId: uuid);
+
+}
+
+export declare class AddCommandPermissionToUserStoryCommand extends AbstractCommand {
+
+    $endpoint: "userStory.commandPermission.add";
+
+    public id: uuid;
+    public endpoint: string;
+    public filter?: string;
+
+    constructor(id: uuid,
+                endpoint: string,
+                filter?: string);
+}
+
+export declare class RemoveCommandPermissionFromUserStoryCommand extends AbstractCommand {
+
+    $endpoint: "userStory.commandPermission.remove";
 
     public permissionId: uuid;
 

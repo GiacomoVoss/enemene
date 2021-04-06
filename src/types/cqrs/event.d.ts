@@ -1,5 +1,6 @@
 import {ConstructorOf, uuid} from "../base";
 import {DataObject} from "../model";
+import {Observable} from "rxjs";
 
 export declare function EventHandler<T extends AbstractEvent>(eventType: ConstructorOf<T>, idExtractor?: (event: T) => uuid): Function;
 export declare function EventHandler<T extends AbstractEvent>(eventType: ConstructorOf<T>, global?: true): Function;
@@ -27,11 +28,17 @@ export declare class Event extends DataObject<Event> implements EventMetadata {
 
     aggregateId: uuid;
 
-    createdAt: string;
+    createdAt: Date;
 
     data: any;
 
     correlationId?: string;
     causationId?: string;
     causedByPersonId?: string;
+}
+
+
+export declare class EventRepositoryService {
+
+    public listen(events: ConstructorOf<AbstractEvent>[], aggregateId?: uuid): Observable<[AbstractEvent, Event]>;
 }

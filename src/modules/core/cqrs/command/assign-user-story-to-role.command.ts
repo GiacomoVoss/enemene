@@ -7,6 +7,6 @@ export class AssignUserStoryToRoleCommand extends AbstractCommand {
     $endpoint = "role.userStory.assign";
 
     constructor(public userStoryId: uuid) {
-        super(Validate.requiredFields("userStoryId"));
+        super(Validate.commandInput({userStoryId: "User story ID"}));
     }
 }

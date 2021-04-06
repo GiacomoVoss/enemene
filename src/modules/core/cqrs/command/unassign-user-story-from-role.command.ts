@@ -7,6 +7,6 @@ export class UnassignUserStoryFromRoleCommand extends AbstractCommand {
     $endpoint = "role.userStory.unassign";
 
     constructor(public userStoryId: uuid) {
-        super(Validate.requiredFields("userStoryId"));
+        super(Validate.commandInput({userStoryId: "User story ID"}));
     }
 }

@@ -4,10 +4,10 @@ import {Validate} from "../../validation/class/validate.class";
 
 export class RemoveReadPermissionFromUserStoryCommand extends AbstractCommand {
 
-    $endpoint = "readPermission.delete";
+    $endpoint = "userStory.readPermission.remove";
 
     constructor(public permissionId: uuid) {
-        super(Validate.requiredFields("permissionId"));
+        super(Validate.commandInput({permissionId: "Permission ID"}));
     }
 
 }

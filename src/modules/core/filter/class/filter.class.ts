@@ -10,6 +10,7 @@ import {FilterTrue} from "./filter-true.class";
 import {AbstractFilter} from "./abstract-filter.class";
 import {FilterGreaterOrEqual} from "./filter-greater-or-equal.class";
 import {FilterLessOrEqual} from "./filter-less-or-equal.class";
+import {FilterFalse} from "./filter-false.class";
 
 export class Filter {
 
@@ -51,5 +52,9 @@ export class Filter {
 
     public static true(): AbstractFilter {
         return new FilterTrue();
+    }
+
+    public static false(): AbstractFilter {
+        return new FilterFalse();
     }
 }

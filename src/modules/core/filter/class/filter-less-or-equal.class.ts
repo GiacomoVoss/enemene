@@ -3,6 +3,8 @@ import {serializable} from "../../../../base/type/serializable.type";
 import {get} from "lodash";
 import {AbstractFilter} from "./abstract-filter.class";
 import {Op} from "sequelize";
+import {RequestContext} from "../../router/interface/request-context.interface";
+import {AbstractUserReadModel} from "../../auth";
 
 export class FilterLessOrEqual extends AbstractFilter {
     constructor(private field: string,
@@ -18,15 +20,20 @@ export class FilterLessOrEqual extends AbstractFilter {
         }
     }
 
-    public evaluate(object: any): boolean {
+    public evaluate(object: any, context: RequestContext<AbstractUserReadModel>): boolean {
         const value: serializable = get(object, this.field);
-        if (this.value === null || this.value === undefined) {
+        const myValue: number | Date | string = this.getValue(this.value, context);
+        if (myValue === null || myValue === undefined) {
             return false;
         }
-        if (typeof this.value === "number") {
-            return this.value <= value;
-        } else {
-            return this.value.getTime() <= (value as Date).getTime();
+        if (typeof myValue === "number") {
+            return myValue >= value;
+        } else if (myValue instanceof Date) {
+            return myValue.getTime() <= (value as Date).getTime();
         }
+    }
+
+    public toString(): string {
+        return `${this.field} ≤ '${this.value}'`;
     }
 }

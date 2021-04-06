@@ -1,36 +1,57 @@
 import {Aggregate} from "../class/aggregate.class";
 import {AggregateRegistryService} from "./aggregate-registry.service";
 import {EnemeneCqrs} from "../../application";
-import {EventRepositoryService} from "./event-repository.service";
-import {Event} from "../entity/event.model";
+import {Dictionary} from "../../../../base/type/dictionary.type";
+import {set} from "lodash";
 import {AbstractEvent} from "../class/abstract-event.class";
-import {EventHandlerDefinition} from "../interface/event-handler-definition.interface";
-import {EventRegistryService} from "./event-registry.service";
+import {Event} from "../entity/event.model";
+import {ConstructorOf} from "../../../../base/constructor-of";
+import {UnsupportedOperationError} from "../../error";
 
 export class AggregateRepositoryService {
 
     private aggregateRegistryService: AggregateRegistryService = EnemeneCqrs.app.inject(AggregateRegistryService);
-    private eventRepository: EventRepositoryService = EnemeneCqrs.app.inject(EventRepositoryService);
-    private eventRegistry: EventRegistryService = EnemeneCqrs.app.inject(EventRegistryService);
+    private aggregates: Dictionary<Dictionary<Aggregate>> = {};
 
-    async getAggregateForCommand(commandEndpoint: string, aggregateId: string): Promise<Aggregate> {
-        const aggregate: Aggregate = this.aggregateRegistryService.getAggregateInstanceForCommand(commandEndpoint);
+    get aggregatesById(): Dictionary<Aggregate> {
+        return Object.values(this.aggregates).reduce((result: Dictionary<Aggregate>, map: Dictionary<Aggregate>) => {
+            return {
+                ...result,
+                ...map,
+            };
+        }, {});
+    }
+
+    getAggregateForCommand(commandEndpoint: string, aggregateId: string): Aggregate {
+        const aggregateName: string = this.aggregateRegistryService.getAggregateClassForCommand(commandEndpoint)?.name;
+        if (!aggregateName) {
+            throw new UnsupportedOperationError("No command handler found: " + commandEndpoint);
+        }
+        if (!this.aggregates[aggregateName]?.[aggregateId]) {
+            set(this.aggregates, `${aggregateName}.${aggregateId}`, this.aggregateRegistryService.getAggregateInstance(aggregateName));
+        }
+        const aggregate: Aggregate = this.aggregates[aggregateName][aggregateId];
         aggregate.id = aggregateId;
-        await this.buildAggregate(aggregate);
         return aggregate;
     }
 
-    async buildAggregate(aggregate: Aggregate): Promise<void> {
-        const events: Event[] = await this.eventRepository.getAllEventsForAggregateId(aggregate.id);
-        events.forEach(event => this.handleEvent(aggregate, event));
+    public handleEvent(event: AbstractEvent, metadata: Event) {
+        const aggregate: Aggregate = this.getAggregateForEvent(metadata);
+        if (aggregate) {
+            aggregate.handleEvent(metadata);
+        }
     }
 
-    public handleEvent(aggregate: Aggregate, metadata: Event) {
-        const event: AbstractEvent = this.eventRegistry.parseEvent(metadata);
-        const handler: EventHandlerDefinition = aggregate.$eventHandlers[metadata.eventType];
-        if (handler) {
-            handler.handler.apply(aggregate, [event, metadata]);
-            aggregate.version = aggregate.version + 1;
+    private getAggregateForEvent(event: Event): Aggregate {
+        const aggregateClass: ConstructorOf<Aggregate> = this.aggregateRegistryService.getAggregateClassForEvent(event.eventType);
+        if (!aggregateClass) {
+            return undefined;
         }
+        if (!this.aggregates[aggregateClass.name]?.[event.aggregateId]) {
+            set(this.aggregates, `${aggregateClass.name}.${event.aggregateId}`, this.aggregateRegistryService.getAggregateInstance(aggregateClass.name));
+        }
+        const aggregate: Aggregate = this.aggregates[aggregateClass.name][event.aggregateId];
+        aggregate.id = event.aggregateId;
+        return aggregate;
     }
 }

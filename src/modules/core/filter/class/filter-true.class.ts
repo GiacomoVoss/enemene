@@ -10,4 +10,8 @@ export class FilterTrue extends AbstractFilter {
     public evaluate(object: any): boolean {
         return true;
     }
+
+    public toString(): string {
+        return "true";
+    }
 }

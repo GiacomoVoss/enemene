@@ -2,13 +2,13 @@ import {Enemene} from "../../application";
 import {AbstractUserReadModel} from "../interface/abstract-user-read-model.interface";
 import {ConstructorOf} from "../../../../base/constructor-of";
 import {AuthService} from "./auth.service";
-import {ReadModelRepositoryService} from "../../cqrs";
+import {ObjectRepositoryService} from "../../cqrs/service/object-repository.service";
 
 const fs = require("fs");
 
 export class AuthCqrsService {
 
-    private readModelRepository: ReadModelRepositoryService = Enemene.app.inject(ReadModelRepositoryService);
+    private objectRepository: ObjectRepositoryService = Enemene.app.inject(ObjectRepositoryService);
 
     public PRIVATE_KEY: string;
     public PUBLIC_KEY: string;
@@ -32,7 +32,7 @@ export class AuthCqrsService {
     }
 
     public findUser(username: string): AbstractUserReadModel | null {
-        return this.readModelRepository.getObjects(Enemene.app.config.userModel as ConstructorOf<AbstractUserReadModel>)
+        return this.objectRepository.getObjects(Enemene.app.config.userModel as ConstructorOf<AbstractUserReadModel>)
             .find(user => user.username === username && user.active);
     }
 }

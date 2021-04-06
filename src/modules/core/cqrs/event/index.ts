@@ -1,5 +1,7 @@
 export * from "./user-story-read-permission-added-v1.event";
+export * from "./user-story-command-permission-added-v1.event";
 export * from "./user-story-read-permission-removed-v1.event";
+export * from "./user-story-command-permission-added-v1.event";
 export * from "./role-created.v1.event";
 export * from "./role-deleted.v1.event";
 export * from "./role-updated.v1.event";

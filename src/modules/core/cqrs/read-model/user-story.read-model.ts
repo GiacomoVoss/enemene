@@ -1,26 +1,18 @@
 import {ReadModel} from "../class/read-model.class";
-import {AbstractFilter, Filter} from "../../filter";
-import {ConstructorOf} from "../../../../base/constructor-of";
-import {AbstractCommand} from "../class/abstract-command.class";
 import {EventHandler} from "../decorator/event-handler.decorator";
 import {UserStoryCreatedV1Event, UserStoryDeletedV1Event, UserStoryReadPermissionAddedV1Event, UserStoryReadPermissionRemovedV1Event} from "../event";
-import {EventMetadata} from "../interface/event-metadata.interface";
 import {ReadPermission} from "../interface/read-permission.interface";
-import {ReadModelRegistryService} from "../service/read-model-registry.service";
-import {EnemeneCqrs} from "../../application";
-import {ReadEndpoint} from "../decorator/read-endpoint.decorator";
+import {UserStoryCommandPermissionAddedV1Event} from "../event/user-story-command-permission-added-v1.event";
+import {UserStoryCommandPermissionRemovedV1Event} from "../event/user-story-command-permission-removed-v1.event";
+import {CommandPermission} from "../interface/command-permission.interface";
 
-@ReadEndpoint
 export class UserStory extends ReadModel {
 
     public name: string;
 
     public readModelPermissions: ReadPermission[] = [];
 
-    public commandPermissions: {
-        command: ConstructorOf<AbstractCommand>;
-        filter?: AbstractFilter;
-    };
+    public commandPermissions: CommandPermission[] = [];
 
     @EventHandler(UserStoryCreatedV1Event)
     handleCreated(event: UserStoryCreatedV1Event) {
@@ -32,20 +24,35 @@ export class UserStory extends ReadModel {
         this.deleted = true;
     }
 
-    @EventHandler(UserStoryReadPermissionAddedV1Event, event => event.userStoryId)
-    handleReadPermissionCreated(event: UserStoryReadPermissionAddedV1Event, metadata: EventMetadata) {
-        const newReadPermission: ReadPermission = {
+    @EventHandler(UserStoryReadPermissionAddedV1Event)
+    handleReadPermissionCreated(event: UserStoryReadPermissionAddedV1Event) {
+        this.readModelPermissions.push({
             id: event.permissionId,
             userStoryId: this.id,
-            readModel: EnemeneCqrs.app.inject(ReadModelRegistryService).getReadModelConstructor(event.readModel),
+            readModel: event.readModel,
             fields: event.fields ?? true,
-            filter: Filter.true()
-        };
-        this.readModelPermissions.push(newReadPermission);
+            filter: event.filter,
+        });
     }
 
-    @EventHandler(UserStoryReadPermissionRemovedV1Event, event => event.userStoryId)
-    handleReadPermissionDeleted(event: UserStoryReadPermissionRemovedV1Event, metadata: EventMetadata) {
-        this.readModelPermissions.filter(p => p.id !== metadata.aggregateId);
+    @EventHandler(UserStoryReadPermissionRemovedV1Event)
+    handleReadPermissionRemoved(event: UserStoryReadPermissionRemovedV1Event) {
+        this.readModelPermissions.filter(p => p.id !== event.permissionId);
+    }
+
+    @EventHandler(UserStoryCommandPermissionAddedV1Event)
+    handleCommandPermissionAdded(event: UserStoryCommandPermissionAddedV1Event) {
+        this.commandPermissions.push({
+            id: event.permissionId,
+            userStoryId: this.id,
+            endpoint: event.endpoint,
+            filter: event.filter,
+        });
+    }
+
+
+    @EventHandler(UserStoryCommandPermissionRemovedV1Event)
+    handleCommandPermissionRemoved(event: UserStoryCommandPermissionRemovedV1Event) {
+        this.commandPermissions = this.commandPermissions.filter(p => p.id !== event.permissionId);
     }
 }

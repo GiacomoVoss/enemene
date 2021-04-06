@@ -1,4 +1,7 @@
 import {AbstractValidate} from "../validation";
+import {uuid} from "../../base/type/uuid.type";
+import {RequestContext} from "../../modules/core/router/interface/request-context.interface";
+import {AbstractUserReadModel} from "../../modules/core/auth";
 
 export declare abstract class AbstractCommand {
 
@@ -18,5 +21,14 @@ export declare function SemanticCommand(type: SemanticCommandType): Function;
 
 export declare class CommandBus {
 
-    executeCommand(command: AbstractCommand, aggregateId: string): Promise<void>;
+    public executeCommand(command: AbstractCommand, aggregateId: string, aggregateVersion?: number, context?: RequestContext<AbstractUserReadModel>): void;
+}
+
+export interface CommandExecution<C extends AbstractCommand> {
+    command: C;
+    aggregateId: uuid;
+}
+
+export interface CommandResult {
+    value?: any;
 }
