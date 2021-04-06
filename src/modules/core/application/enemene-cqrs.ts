@@ -15,6 +15,7 @@ import {ConstructorOf} from "../../../base/constructor-of";
 import {AbstractUserReadModel} from "../auth/interface/abstract-user-read-model.interface";
 import AuthCqrsController from "../auth/auth-cqrs.controller";
 import {Snapshot} from "../cqrs/entity/snapshot.model";
+import {SagaRepositoryService} from "../cqrs/service/saga-repository.service";
 
 require("express-async-errors");
 
@@ -141,6 +142,7 @@ export class EnemeneCqrs extends Enemene {
         await EnemeneCqrs.app.inject(EventRegistryService).init();
         await EnemeneCqrs.app.inject(ReadModelRepositoryService).init();
         await EnemeneCqrs.app.inject(CommandRegistryService).init();
+        await EnemeneCqrs.app.inject(SagaRepositoryService).init();
         if (Enemene.app.config.security) {
             AuthService.initCqrs(Enemene.app.config.security.jwtPublicKeyPath, Enemene.app.config.security.jwtPrivateKeyPath, Enemene.app.config.userModel as ConstructorOf<AbstractUserReadModel>);
         }

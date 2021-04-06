@@ -97,7 +97,7 @@ export class EventRepositoryService {
         });
     }
 
-    public async persistEvents(events: AbstractEvent[], aggregateId: uuid, causationId: uuid, causedByUserId: uuid, aggregateVersion: number): Promise<void> {
+    public async persistEvents(events: AbstractEvent[], aggregateId: uuid, causationId: uuid, correlationId: uuid, causedByUserId: uuid, aggregateVersion: number): Promise<void> {
         const eventsToPersist: Event[] = events.map((event: AbstractEvent) => {
             return Event.build({
                 id: UuidService.getUuid(),
@@ -105,6 +105,7 @@ export class EventRepositoryService {
                 aggregateId,
                 causationId,
                 causedByUserId,
+                correlationId,
                 data: event,
             });
         });

@@ -9,5 +9,6 @@ export interface CommandQueueEntry {
     aggregateId: uuid;
     version?: number;
     context?: RequestContext<AbstractUserReadModel>;
+    correlationId?: uuid;
     result: Subject<any>;
 }

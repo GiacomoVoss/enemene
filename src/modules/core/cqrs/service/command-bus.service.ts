@@ -40,7 +40,7 @@ export class CommandBus {
             .subscribe();
     }
 
-    public executeCommand(command: AbstractCommand, aggregateId: string, version?: number, context?: RequestContext<AbstractUserReadModel>): Observable<any> {
+    public executeCommand(command: AbstractCommand, aggregateId: string, version?: number, correlationId?: uuid, context?: RequestContext<AbstractUserReadModel>): Observable<any> {
         EnemeneCqrs.log.silly(this.constructor.name, `Command: ${command.$endpoint} (${aggregateId})`);
         const result: Subject<any> = new Subject();
         this.commandQueue.next({
@@ -49,6 +49,7 @@ export class CommandBus {
             version,
             context,
             result,
+            correlationId,
         });
 
         return result;
@@ -58,7 +59,7 @@ export class CommandBus {
         await this.executeCommandInternal(queueEntry);
     }
 
-    private async executeCommandInternal({command, aggregateId, version, context, result}: CommandQueueEntry): Promise<any> {
+    private async executeCommandInternal({command, aggregateId, version, context, result, correlationId}: CommandQueueEntry): Promise<any> {
         try {
             this.validateCommand(command, aggregateId, version, context);
         } catch (e) {
@@ -92,7 +93,7 @@ export class CommandBus {
         }
 
         const causationId: uuid = UuidService.getUuid();
-        await this.eventRepository.persistEvents(eventList, aggregateId, causationId, context?.currentUser?.id, aggregate.version);
+        await this.eventRepository.persistEvents(eventList, aggregateId, causationId, correlationId ?? UuidService.getUuid(), context?.currentUser?.id, aggregate.version);
     }
 
     private validateCommand(command: AbstractCommand, aggregateId: string, aggregateVersion?: number, context?: RequestContext<AbstractUserReadModel>): uuid | undefined {

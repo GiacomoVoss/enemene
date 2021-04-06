@@ -26,7 +26,7 @@ export class CommandController extends AbstractController {
             aggregateVersion = 0;
         }
 
-        return this.commandBus.executeCommand(this.commandRegistry.createCommand(commandEndpoint, body), aggregateId, aggregateVersion, context).pipe(take(1)).toPromise();
+        return this.commandBus.executeCommand(this.commandRegistry.createCommand(commandEndpoint, body), aggregateId, aggregateVersion, undefined, context).pipe(take(1)).toPromise();
     }
 
     @Get("/result/:id", true)
