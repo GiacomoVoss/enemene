@@ -21,10 +21,12 @@ import {fromPromise} from "rxjs/internal-compatibility";
 import {uuid} from "../../../../base/type/uuid.type";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {CommandResult} from "../interface/command-result.interface";
+import {AggregateRegistryService} from "./aggregate-registry.service";
 
 export class CommandBus {
 
     private aggregateRepository: AggregateRepositoryService = EnemeneCqrs.app.inject(AggregateRepositoryService);
+    private aggregateRegistryService: AggregateRegistryService = EnemeneCqrs.app.inject(AggregateRegistryService);
     private permissionCqrsService: PermissionCqrsService = EnemeneCqrs.app.inject(PermissionCqrsService);
     private eventRepository: EventRepositoryService = EnemeneCqrs.app.inject(EventRepositoryService);
     private validationService: ValidationService = EnemeneCqrs.app.inject(ValidationService);
@@ -61,12 +63,12 @@ export class CommandBus {
 
     private async executeCommandInternal({command, aggregateId, version, context, result, correlationId}: CommandQueueEntry): Promise<any> {
         try {
-            this.validateCommand(command, aggregateId, version, context);
+            await this.validateCommand(command, aggregateId, version, context);
         } catch (e) {
             result.error(e);
             return;
         }
-        const aggregate: Aggregate = this.aggregateRepository.getAggregateForCommand(command.$endpoint, aggregateId);
+        const aggregate: Aggregate = await this.aggregateRepository.getAggregateForCommand(command.$endpoint, aggregateId);
         const commandHandler: CommandHandlerDefinition = aggregate.$commandHandlers.find(handler => handler.endpoint === command.$endpoint);
         if (!commandHandler) {
             throw new UnsupportedOperationError("No command handler found: " + command.$endpoint);
@@ -96,18 +98,18 @@ export class CommandBus {
         await this.eventRepository.persistEvents(eventList, aggregateId, causationId, correlationId ?? UuidService.getUuid(), context?.currentUser?.id, aggregate.version);
     }
 
-    private validateCommand(command: AbstractCommand, aggregateId: string, aggregateVersion?: number, context?: RequestContext<AbstractUserReadModel>): uuid | undefined {
+    private async validateCommand(command: AbstractCommand, aggregateId: string, aggregateVersion?: number, context?: RequestContext<AbstractUserReadModel>): Promise<void> {
         this.validationService.validateCommand(command);
-        const aggregate: Aggregate = this.aggregateRepository.getAggregateForCommand(command.$endpoint, aggregateId);
+        const aggregate: Aggregate = await this.aggregateRepository.getAggregateForCommand(command.$endpoint, aggregateId);
         const currentAggregateVersion: number = aggregate.version;
-
-        if (context) {
-            this.permissionCqrsService.checkCommandPermission(command.$endpoint, aggregate, context, this.objectRepository);
-        }
 
         const commandHandler: CommandHandlerDefinition = aggregate.$commandHandlers.find(handler => handler.endpoint === command.$endpoint);
         if (!commandHandler) {
             throw new UnsupportedOperationError("No command handler found: " + command.$endpoint);
+        }
+
+        if (!commandHandler.isPublic && context?.currentUser) {
+            this.permissionCqrsService.checkCommandPermission(command.$endpoint, aggregate, context, this.objectRepository);
         }
 
         if (command.$semanticType === SemanticCommandType.CREATE) {
@@ -131,11 +133,5 @@ export class CommandBus {
             // Not a RestoreCommand on a deleted object?
             throw new ObjectNotFoundError();
         }
-
-        if (commandHandler.returnsAsyncResult) {
-            return UuidService.getUuid();
-        }
-
-        return undefined;
     }
 }

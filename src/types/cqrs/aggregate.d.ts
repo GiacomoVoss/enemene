@@ -17,4 +17,4 @@ export abstract class Aggregate {
     protected isEqual(command: AbstractCommand, ...fields: string[]): boolean;
 }
 
-export declare function CommandHandler(commandType: ConstructorOf<AbstractCommand>, returnsAsyncResult?: boolean): Function;
+export declare function CommandHandler(commandType: ConstructorOf<AbstractCommand>, isPublic?: boolean): Function;

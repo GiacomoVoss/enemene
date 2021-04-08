@@ -17,9 +17,10 @@ export class ReadController extends AbstractController {
     async getObject(@Path("endpoint") endpoint: string,
                     @Path("id") id: string,
                     @Query("fields") fieldsString: string,
+                    @Query("includeDeleted") deleted: boolean,
                     @Context context: RequestContext<AbstractUserReadModel>) {
         const readModelClass: ConstructorOf<ReadModel> | undefined = this.readModelRegistry.getReadModelForEndpoint(endpoint);
-        return this.objectRepository.getObjectWithPermissions(readModelClass, id, context, fieldsString);
+        return this.objectRepository.getObjectWithPermissions(readModelClass, id, context, fieldsString, !!deleted);
     }
 
     @Get("/:endpoint", true)
@@ -29,18 +30,21 @@ export class ReadController extends AbstractController {
                   @Query("offset") offsetString: string,
                   @Query("order") orderString: string,
                   @Query("filter") filterString: string,
+                  @Query("includeDeleted") deleted: boolean,
                   @Context context: RequestContext<AbstractUserReadModel>) {
         const readModelClass: ConstructorOf<ReadModel> | undefined = this.readModelRegistry.getReadModelForEndpoint(endpoint);
-        return this.objectRepository.getObjectsWithPermissions(readModelClass, context, ObjectRepositoryService.getObjectsQueryInput(fields, orderString, limitString, offsetString, filterString));
+        const result = this.objectRepository.getObjectsWithPermissions(readModelClass, context, ObjectRepositoryService.getObjectsQueryInput(fields, orderString, limitString, offsetString, filterString), !!deleted);
+        return result;
     }
 
     @Get("/count/:endpoint", true)
     async count(@Path("endpoint") endpoint: string,
                 @Query("filter") filterString: string,
+                @Query("includeDeleted") deleted: boolean,
                 @Context context: RequestContext<AbstractUserReadModel>) {
         const readModelClass: ConstructorOf<ReadModel> | undefined = this.readModelRegistry.getReadModelForEndpoint(endpoint);
         return {
-            count: this.objectRepository.getObjectsWithPermissions(readModelClass, context, ObjectRepositoryService.getObjectsQueryInput(undefined, undefined, undefined, undefined, filterString)).length
+            count: this.objectRepository.countObjectsWithPermission(readModelClass, context, ObjectRepositoryService.getObjectsQueryInput(undefined, undefined, undefined, undefined, filterString), !!deleted)
         };
     }
 }

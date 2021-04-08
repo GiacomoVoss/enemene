@@ -14,8 +14,10 @@ import {AuthService} from "../auth/service/auth.service";
 import {ConstructorOf} from "../../../base/constructor-of";
 import {AbstractUserReadModel} from "../auth/interface/abstract-user-read-model.interface";
 import AuthCqrsController from "../auth/auth-cqrs.controller";
-import {Snapshot} from "../cqrs/entity/snapshot.model";
 import {SagaRepositoryService} from "../cqrs/service/saga-repository.service";
+import mkdirp from "mkdirp";
+import {FileService} from "../file/service/file.service";
+import path from "path";
 
 require("express-async-errors");
 
@@ -49,13 +51,13 @@ export class EnemeneCqrs extends Enemene {
                 unique: true,
                 primaryKey: true,
             },
-            correlation_id: {
+            correlationId: {
                 type: DataTypes.STRING(36),
             },
-            causation_id: {
+            causationId: {
                 type: DataTypes.STRING(36),
             },
-            caused_by_user_id: {
+            causedByUserId: {
                 type: DataTypes.STRING(36),
             },
             eventType: {
@@ -89,46 +91,11 @@ export class EnemeneCqrs extends Enemene {
             tableName: "event",
             updatedAt: false,
         });
-
-        Snapshot.init({
-            id: {
-                type: DataTypes.STRING(36),
-                allowNull: false,
-                unique: true,
-                primaryKey: true,
-            },
-            position: {
-                type: DataTypes.INTEGER,
-                allowNull: false,
-            },
-            data: {
-                type: DataTypes.JSON,
-                allowNull: true,
-                get: function (this: Model) {
-                    const value = this.getDataValue("data") as any;
-                    if (value === undefined || value === null) {
-                        return value;
-                    }
-                    if (typeof value === "string") {
-                        return JSON.parse(value);
-                    }
-                    return value;
-                },
-                set: function (this: Model, value: string) {
-                    this.setDataValue("data", value as any);
-                }
-            }
-        }, {
-            sequelize: this.db,
-            modelName: "Snapshot",
-            tableName: "snapshot",
-            updatedAt: false,
-        });
     }
 
     public async start(): Promise<void> {
-        await this.inject(EventRepositoryService).startEventListener();
         await super.start();
+        await this.inject(EventRepositoryService).startEventListener();
     }
 
     public async setup(): Promise<void> {
@@ -137,6 +104,7 @@ export class EnemeneCqrs extends Enemene {
             alter: true,
         });
         await this.setupServices();
+        await mkdirp(path.join(FileService.DATA_PATH, "snapshots"));
         await EnemeneCqrs.app.inject(AggregateRegistryService).init();
         await EnemeneCqrs.app.inject(ReadModelRegistryService).init();
         await EnemeneCqrs.app.inject(EventRegistryService).init();

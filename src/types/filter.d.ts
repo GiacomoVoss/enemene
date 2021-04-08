@@ -14,9 +14,9 @@ export declare class Filter {
 
     public static equals(field: string, value: serializable): AbstractFilter;
 
-    public static greaterOrEqual(field: string, value: number | Date): AbstractFilter;
+    public static greaterOrEqual(field: string, value: number | Date | `{${string}}`): AbstractFilter;
 
-    public static lessOrEqual(field: string, value: number | Date): AbstractFilter;
+    public static lessOrEqual(field: string, value: number | Date | `{${string}}`): AbstractFilter;
 
     public static exists(field: string, arg?: AbstractFilter): AbstractFilter;
 

@@ -1,26 +1,16 @@
-import {Enemene} from "../../application";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {ConstructorOf} from "../../../../base/constructor-of";
-import {FileService} from "../../file/service/file.service";
 import {AbstractEvent} from "../class/abstract-event.class";
 import {Event} from "../entity/event.model";
+import {FileRegistryService} from "../../service/file-registry.service";
 
-export class EventRegistryService {
-
-    private fileService: FileService = Enemene.app.inject(FileService);
+export class EventRegistryService extends FileRegistryService {
 
     private events: Dictionary<ConstructorOf<AbstractEvent>> = {};
 
     async init(): Promise<void> {
-        const eventFiles: string[] = this.fileService.scanForFilePattern(Enemene.app.config.modulesPath, /.*\.event\.js/);
-        const eventModules: Dictionary<ConstructorOf<AbstractEvent>>[] = await Promise.all(eventFiles.map((filePath: string) => import(filePath)));
-
-        const systemModules = await import("../event");
-
-        [systemModules, ...eventModules].forEach((moduleMap: Dictionary<ConstructorOf<AbstractEvent>>) => {
-            Object.values(moduleMap).forEach((event: ConstructorOf<AbstractEvent>) => {
-                this.events[event.name] = event;
-            });
+        (await this.loadFiles(/.*\.event\.js/, await import("../event"))).forEach((event: ConstructorOf<AbstractEvent>) => {
+            this.events[event.name] = event;
         });
     }
 

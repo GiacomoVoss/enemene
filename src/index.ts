@@ -17,6 +17,7 @@ export * from "./modules/core/migration";
 export * from "./modules/core/router";
 export * from "./modules/core/service/date.service";
 export * from "./modules/core/service/uuid.service";
+export * from "./modules/core/service/file-registry.service";
 export * from "./modules/core/validation";
 export * from "./populator";
 export * from "./modules/core/cqrs";

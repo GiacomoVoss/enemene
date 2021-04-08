@@ -99,6 +99,7 @@ export class ObjectRepositoryService {
         }
 
         let result: Dictionary<serializable, keyof T>[] = this.permissionCqrsService.getFilteredObjects(Object.values(objects), context, this);
+
         if (query.filter) {
             result = result.filter(object => query.filter.evaluate(object, context));
         }
@@ -122,6 +123,26 @@ export class ObjectRepositoryService {
         }
 
         return result.map(object => this.getByFields(object, query?.fields));
+    }
+
+    public countObjectsWithPermission<T extends ReadModel>(readModel: ConstructorOf<T>, context: RequestContext<AbstractUserReadModel>, query?: ObjectsQueryInput, includeDeleted: boolean = false): number {
+        const objects: Dictionary<T> | undefined = this.objects[readModel.name] as Dictionary<T> | undefined;
+        const shouldIncludeDeleted = context instanceof UnrestrictedRequestContext && includeDeleted;
+
+        if (!objects) {
+            throw new ObjectNotFoundError(readModel.name);
+        }
+
+        let result: Dictionary<serializable, keyof T>[] = this.permissionCqrsService.getFilteredObjects(Object.values(objects), context, this);
+        if (query.filter) {
+            result = result.filter(object => query.filter.evaluate(object, context));
+        }
+
+        if (!shouldIncludeDeleted) {
+            result = result.filter(object => !object.deleted);
+        }
+
+        return result.length;
     }
 
     public getObjects<T extends ReadModel>(readModel: ConstructorOf<T>, filter?: AbstractFilter, includeDeleted: boolean = false): T[] {
@@ -185,15 +206,17 @@ export class ObjectRepositoryService {
     }
 
     public deserializeSnapshot(data: any): void {
-        this.objects = Object.entries(data).reduce((completeResult: Dictionary<Dictionary<ReadModel>>, [readModelName, entries]) => {
-            completeResult[readModelName] = Object.entries(entries).reduce((subResult: Dictionary<ReadModel>, [id, objectData]) => {
-                const object: ReadModel = this.getOrCreateObject(readModelName, id);
-                object.snapshotDeserialize(objectData, this.readModelRegistry.readModelClasses);
-                subResult[id] = object;
-                return subResult;
-            }, {});
-            return completeResult;
-        }, {});
+        for (const readModelName in data) {
+            if (data.hasOwnProperty(readModelName)) {
+                for (const id in data[readModelName]) {
+                    if (data[readModelName].hasOwnProperty(id)) {
+                        const object: ReadModel = this.getOrCreateObject(readModelName, id);
+                        object.snapshotDeserialize(data[readModelName][id], this.readModelRegistry.readModelClasses);
+                        object.snapshotDeserialize(data[readModelName][id], this.readModelRegistry.readModelClasses);
+                    }
+                }
+            }
+        }
     }
 
     public serializeSnapshot(): Dictionary<serializable> {
@@ -208,6 +231,9 @@ export class ObjectRepositoryService {
 
     public getOrCreateObject<T extends ReadModel>(name: string | ConstructorOf<T>, id: uuid): T {
         const readModelName: string = typeof name === "string" ? name : name.name;
+        if (!this.objects[readModelName]) {
+            this.objects[readModelName] = {};
+        }
         if (!this.objects[readModelName][id]) {
             this.objects[readModelName][id] = new (this.readModelRegistry.getReadModelConstructor(readModelName))(id);
         }

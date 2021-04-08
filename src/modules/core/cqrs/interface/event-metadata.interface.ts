@@ -9,5 +9,5 @@ export interface EventMetadata {
 
     causationId?: string;
 
-    causedByPersonId?: string;
+    causedByUserId?: string;
 }

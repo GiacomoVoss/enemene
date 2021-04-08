@@ -7,7 +7,7 @@ import {ReadEndpoint} from "../decorator/read-endpoint.decorator";
 import {ReadModel} from "../class/read-model.class";
 import {CommandPermission} from "../interface/command-permission.interface";
 
-@ReadEndpoint
+@ReadEndpoint()
 export class RoleReadModel extends ReadModel {
 
     public name: string;

@@ -241,6 +241,8 @@ export class RouterService {
                     ...context,
                     currentUser: req.payload,
                     language: req.header(HttpHeader.LANGUAGE),
+                    currentDate: new Date(),
+                    currentDateTime: new Date(),
                     transaction,
                 } as RequestContext<AbstractUser>;
                 break;

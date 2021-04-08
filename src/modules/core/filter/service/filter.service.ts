@@ -12,6 +12,7 @@ export enum FilterTokenType {
     EQUALS = "EQUALS",
     NOT_EQUALS = "NOT_EQUALS",
     NOT = "NOT",
+    LIKE = "LIKE",
 }
 
 export class FilterService {
@@ -23,6 +24,7 @@ export class FilterService {
         [FilterTokenType.PARENTHESES]: /^\((.*)\)$/,
         [FilterTokenType.OR]: /^.* or .*$/,
         [FilterTokenType.EXISTS]: /^exists\((.*)\)$/,
+        [FilterTokenType.LIKE]: /^like\((.*)\)$/,
         [FilterTokenType.NOT]: /^not\((.*)\)$/,
         [FilterTokenType.EQUALS]: /^[A-Za-z0-9]+\s*==\s*([0-9,.]+|'.*'|{[A-Za-z0-9.]+}|null|undefined)$/,
         [FilterTokenType.NOT_EQUALS]: /^[A-Za-z0-9]+\s*!=\s*([0-9,.]*|'.*'|{[A-Za-z0-9.]+}|null|undefined)$/,
@@ -36,6 +38,7 @@ export class FilterService {
         [FilterTokenType.PARENTHESES]: FilterService.handleParanthesis,
         [FilterTokenType.NOT_EQUALS]: FilterService.handleNotEquals,
         [FilterTokenType.NOT]: FilterService.handleNot,
+        [FilterTokenType.LIKE]: FilterService.handleLike,
     };
 
     public static toSequelize<ENTITY extends DataObject<ENTITY>>(filter: AbstractFilter, entity: ConstructorOf<ENTITY>): FindOptions {
@@ -100,6 +103,12 @@ export class FilterService {
 
     private static handleNot(string: string): AbstractFilter {
         return Filter.not(this.stringToFilter(string.replace(this.EXPRESSIONS.NOT, "$1")));
+    }
+
+    private static handleLike(string: string): AbstractFilter {
+        const tokens: string[] = string.replace(this.EXPRESSIONS.LIKE, "$1")
+            .split(",");
+        return Filter.like(tokens[0], tokens[1].trim().replace(/^'(.*)'$/, "$1"));
     }
 
     private static parseValue(string: string): any {

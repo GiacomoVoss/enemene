@@ -7,61 +7,64 @@ import {ReadModelRepositoryService} from "./read-model-repository.service";
 import {Op, Transaction} from "sequelize";
 import {UuidService} from "../../service/uuid.service";
 import {EventRegistryService} from "./event-registry.service";
-import {Snapshot} from "../entity/snapshot.model";
 import {WhereOptions} from "sequelize/types/lib/model";
 import {ObjectRepositoryService} from "./object-repository.service";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {serializable} from "../../../../base/type/serializable.type";
-import {AggregateRepositoryService} from "./aggregate-repository.service";
 import {ConstructorOf} from "../../../../base/constructor-of";
 import {filter, map} from "rxjs/operators";
+import {FileService} from "../../file/service/file.service";
+import * as fs from "fs";
+import path from "path";
 
 export class EventRepositoryService {
 
     private eventRegistry: EventRegistryService = EnemeneCqrs.app.inject(EventRegistryService);
     private objectRepository: ObjectRepositoryService = EnemeneCqrs.app.inject(ObjectRepositoryService);
+    private readModelRepository: ReadModelRepositoryService = Enemene.app.inject(ReadModelRepositoryService);
 
     public queue = new Subject<Event>();
 
     private latestPosition: number = 0;
+    private latestSnapshotPosition: number = 0;
+    private preloadPosition: number = 0;
 
     public async startEventListener(): Promise<void> {
-        const readModelRepository = Enemene.app.inject(ReadModelRepositoryService);
-        const aggregateRepository = Enemene.app.inject(AggregateRepositoryService);
         this.queue.subscribe({
             next: event => {
                 EnemeneCqrs.log.debug(this.constructor.name, `Event ${event.position}: ${event.eventType} (${event.aggregateId})`);
-                readModelRepository.handleEvent(this.eventRegistry.parseEvent(event), event);
-                aggregateRepository.handleEvent(this.eventRegistry.parseEvent(event), event);
+                this.readModelRepository.handleEvent(this.eventRegistry.parseEvent(event), event);
 
                 this.latestPosition = event.position;
-                if (event.position % 1000 === 0) {
+                if (event.position > this.preloadPosition && event.position - this.latestSnapshotPosition > 1000) {
                     this.createSnapshot(event.position);
                 }
             }
         });
 
         // Apply latest snapshot.
-        const latestSnapshot: Snapshot | null = await Snapshot.findOne({
-            order: [["position", "DESC"]],
-        });
-
-        if (latestSnapshot) {
-            EnemeneCqrs.log.info(this.constructor.name, `Rebuilding from Snapshot @ ${latestSnapshot.position}...`);
-            this.objectRepository.deserializeSnapshot(latestSnapshot.data);
-            this.latestPosition = latestSnapshot.position;
+        const snapshotFilePositions: number[] = fs.readdirSync(path.join(FileService.DATA_PATH, "snapshots"))
+            .filter(file => file.match(/s-\d+\.json/))
+            .map(fileName => fileName.replace(/s-(\d+)\.json/, "$1"))
+            .map(f => parseInt(f));
+        snapshotFilePositions.sort();
+        if (snapshotFilePositions.length) {
+            const latestSnapshotFile: string = `s-${snapshotFilePositions.pop()}.json`;
+            EnemeneCqrs.log.info(this.constructor.name, `Recreating events from snapshot ${latestSnapshotFile}`);
+            const data = fs.readFileSync(path.join(FileService.DATA_PATH, "snapshots", latestSnapshotFile));
+            const objectData = JSON.parse(data.toString("utf8"));
+            this.objectRepository.deserializeSnapshot(objectData);
+            this.latestPosition = parseInt(latestSnapshotFile.split(path.sep).pop().replace(/s-(\d*)\.json/, "$1"));
         }
 
         const events: Event[] = await this.getAllEventsFromPosition(this.latestPosition);
         if (events.length) {
             EnemeneCqrs.log.info(this.constructor.name, `Rebuilding from ${events.length} events...`);
+            this.preloadPosition = events[events.length - 1].position;
         }
-        events.forEach(event => {
-            readModelRepository.handleEvent(this.eventRegistry.parseEvent(event), event);
-            aggregateRepository.handleEvent(this.eventRegistry.parseEvent(event), event);
-            this.latestPosition = event.position;
+        events.forEach((event, index) => {
+            this.queue.next(event);
         });
-        this.createSnapshot(this.latestPosition);
     }
 
     public listen(events: ConstructorOf<AbstractEvent>[], aggregateId?: uuid): Observable<[AbstractEvent, Event]> {
@@ -85,18 +88,6 @@ export class EventRepositoryService {
         });
     }
 
-    public async getAllEventsForAggregateId(id: uuid, offset?: number, transaction?: Transaction): Promise<Event[]> {
-        const where: WhereOptions = {
-            aggregateId: id,
-        };
-        return Event.findAll({
-            order: [["position", "ASC"]],
-            offset: offset,
-            where,
-            transaction,
-        });
-    }
-
     public async persistEvents(events: AbstractEvent[], aggregateId: uuid, causationId: uuid, correlationId: uuid, causedByUserId: uuid, aggregateVersion: number): Promise<void> {
         const eventsToPersist: Event[] = events.map((event: AbstractEvent) => {
             return Event.build({
@@ -109,6 +100,7 @@ export class EventRepositoryService {
                 data: event,
             });
         });
+
         const transaction: Transaction = await Enemene.app.db.transaction();
         try {
             await Promise.all(eventsToPersist.map(async event => event.save({transaction})));
@@ -121,27 +113,19 @@ export class EventRepositoryService {
         }
     }
 
-    private createSnapshot(position: number): void {
+    private async createSnapshot(position: number): Promise<void> {
         if (position) {
-            const id: uuid = UuidService.getUuid();
-            Snapshot.findOne({
-                where: {
-                    position: {
-                        [Op.gte]: position,
-                    }
-                }
-            }).then(result => {
-                if (!result) {
-                    EnemeneCqrs.log.debug(this.constructor.name, `Creating snapshot @ ${position}.`);
-                    const data: Dictionary<serializable> = this.objectRepository.serializeSnapshot();
-                    Snapshot.create({
-                        id,
-                        position: position,
-                        data,
-                    }).then(() => {
-                        Snapshot.sequelize.query(`DELETE FROM ${Snapshot.getTableName()} WHERE position < '${position}'`);
-                    });
-                }
+            const fileName: string = path.join(FileService.DATA_PATH, "snapshots", `s-${position}.json`);
+            if (fs.existsSync(fileName)) {
+                return;
+            }
+            const data: Dictionary<serializable> = this.objectRepository.serializeSnapshot();
+            EnemeneCqrs.log.debug(this.constructor.name, `Creating snapshot @ ${position}`);
+            return new Promise(resolve => {
+                fs.writeFile(fileName, JSON.stringify(data), {encoding: "utf8"}, () => {
+                    this.latestSnapshotPosition = position;
+                    resolve();
+                });
             });
         }
     }

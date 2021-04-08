@@ -1,7 +1,6 @@
-import {DataObject, Entity} from "../../model";
+import {DataObject} from "../../model";
 import {uuid} from "../../../../base/type/uuid.type";
 
-@Entity
 export class Event extends DataObject<Event> implements Event {
 
     position: number;

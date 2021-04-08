@@ -2,6 +2,7 @@ import {AbstractValidate} from "../validation";
 import {uuid} from "../../base/type/uuid.type";
 import {RequestContext} from "../../modules/core/router/interface/request-context.interface";
 import {AbstractUserReadModel} from "../../modules/core/auth";
+import {RuntimeError} from "../error";
 
 export declare abstract class AbstractCommand {
 
@@ -31,4 +32,11 @@ export interface CommandExecution<C extends AbstractCommand> {
 
 export interface CommandResult {
     value?: any;
+}
+
+export class UserInputValidationError extends RuntimeError {
+
+    statusCode: 400;
+
+    constructor(message: string);
 }

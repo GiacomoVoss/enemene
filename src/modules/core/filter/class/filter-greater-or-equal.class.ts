@@ -8,7 +8,7 @@ import {AbstractUserReadModel} from "../../auth";
 
 export class FilterGreaterOrEqual extends AbstractFilter {
     constructor(private field: string,
-                private value: number | Date) {
+                private value: number | Date | `{${string}}`) {
         super();
     }
 
@@ -21,7 +21,7 @@ export class FilterGreaterOrEqual extends AbstractFilter {
     }
 
     public evaluate(object: any, context: RequestContext<AbstractUserReadModel>): boolean {
-        const value: serializable = get(object, this.field);
+        const value: serializable | undefined = get(object, this.field, undefined);
         const myValue: number | Date | string = this.getValue(this.value, context);
         if (myValue === null || myValue === undefined) {
             return false;
@@ -31,6 +31,8 @@ export class FilterGreaterOrEqual extends AbstractFilter {
         } else if (myValue instanceof Date) {
             return myValue.getTime() >= (value as Date).getTime();
         }
+
+        return false;
     }
 
     public toString(): string {

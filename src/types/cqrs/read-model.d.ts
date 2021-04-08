@@ -7,10 +7,11 @@ export declare class ReadModel {
     public deleted: boolean;
 
     protected resolveObjectReference<READMODEL extends ReadModel>(clazz: ConstructorOf<READMODEL>, id: uuid): READMODEL;
+
+    toJSON(): any;
 }
 
-export declare function ReadEndpoint(target: ConstructorOf<ReadModel>): void;
-
+export declare function ReadEndpoint(isPublic?: boolean, filter?: AbstractFilter): (target: ConstructorOf<ReadModel>) => void;
 
 export declare class ObjectRepositoryService {
 

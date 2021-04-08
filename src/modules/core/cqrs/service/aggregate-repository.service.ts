@@ -7,6 +7,9 @@ import {AbstractEvent} from "../class/abstract-event.class";
 import {Event} from "../entity/event.model";
 import {ConstructorOf} from "../../../../base/constructor-of";
 import {UnsupportedOperationError} from "../../error";
+import {uuid} from "../../../../base/type/uuid.type";
+import {Transaction} from "sequelize";
+import {WhereOptions} from "sequelize/types/lib/model";
 
 export class AggregateRepositoryService {
 
@@ -22,7 +25,7 @@ export class AggregateRepositoryService {
         }, {});
     }
 
-    getAggregateForCommand(commandEndpoint: string, aggregateId: string): Aggregate {
+    async getAggregateForCommand(commandEndpoint: string, aggregateId: string): Promise<Aggregate> {
         const aggregateName: string = this.aggregateRegistryService.getAggregateClassForCommand(commandEndpoint)?.name;
         if (!aggregateName) {
             throw new UnsupportedOperationError("No command handler found: " + commandEndpoint);
@@ -32,7 +35,21 @@ export class AggregateRepositoryService {
         }
         const aggregate: Aggregate = this.aggregates[aggregateName][aggregateId];
         aggregate.id = aggregateId;
+        const events: Event[] = await this.getAllEventsForAggregateId(aggregateName, aggregateId);
+        events.forEach(event => aggregate.handleEvent(event));
         return aggregate;
+    }
+
+    public async getAllEventsForAggregateId(aggregateName: string, id: uuid, offset?: number, transaction?: Transaction): Promise<Event[]> {
+        const where: WhereOptions = {
+            aggregateId: id,
+        };
+        return Event.findAll<Event>({
+            order: [["position", "ASC"]],
+            offset: offset,
+            where,
+            transaction,
+        });
     }
 
     public handleEvent(event: AbstractEvent, metadata: Event) {
@@ -47,11 +64,6 @@ export class AggregateRepositoryService {
         if (!aggregateClass) {
             return undefined;
         }
-        if (!this.aggregates[aggregateClass.name]?.[event.aggregateId]) {
-            set(this.aggregates, `${aggregateClass.name}.${event.aggregateId}`, this.aggregateRegistryService.getAggregateInstance(aggregateClass.name));
-        }
-        const aggregate: Aggregate = this.aggregates[aggregateClass.name][event.aggregateId];
-        aggregate.id = event.aggregateId;
-        return aggregate;
+        return this.aggregates[aggregateClass.name]?.[event.aggregateId];
     }
 }

@@ -4,9 +4,8 @@ import {AbstractUserReadModel} from "../interface/abstract-user-read-model.inter
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {serializable} from "../../../../base/type/serializable.type";
 import {ObjectRepositoryService} from "../../cqrs/service/object-repository.service";
-import {FilterService} from "../../filter";
+import {AbstractFilter, FilterService} from "../../filter";
 import {ForbiddenError} from "../error/forbidden.error";
-import {defaults} from "lodash";
 
 export class PermissionCqrsService {
 
@@ -32,15 +31,30 @@ export class PermissionCqrsService {
     }
 
     public getFilteredObjects<T extends ReadModel>(objects: T[], context: RequestContext<AbstractUserReadModel>, repository: ObjectRepositoryService): Dictionary<serializable, keyof T>[] {
-        const role: RoleReadModel = repository.getObject(RoleReadModel, context.currentUser.roleId);
-        if (!role) {
-            return [];
-        }
-        const result: Dictionary<Dictionary<serializable, keyof T>> = {};
 
         if (!objects.length) {
             return [];
         }
+
+        if (objects[0].$isPublic) {
+            const filter: AbstractFilter | undefined = objects[0].$filter;
+            if (!filter) {
+                return objects.map(o => o.serialize());
+            } else {
+                return filter.apply(objects, context).map(o => o.serialize());
+            }
+        }
+
+        if (!context.currentUser) {
+            throw new ForbiddenError();
+        }
+
+        const role: RoleReadModel = repository.getObject(RoleReadModel, context.currentUser.roleId);
+        if (!role) {
+            return [];
+        }
+
+        const result: Dictionary<Dictionary<serializable, keyof T>> = {};
 
         const readModelName: string = objects[0].$endpoint;
 
@@ -50,10 +64,11 @@ export class PermissionCqrsService {
                 const singleObjectsResult: ReadModel[] = permission.filter ? FilterService.stringToFilter(permission.filter).apply(objects, context) : objects;
                 if (singleObjectsResult.length) {
                     singleObjectsResult.forEach(singleObject => {
-                        const singleResult: Dictionary<serializable, keyof T> = this.filterFields(singleObject.toJSON(), permission.fields);
-                        result[singleObject.id] = {
-                            ...defaults(result[singleObject.id], singleResult),
-                        };
+                        const singleResult: Dictionary<serializable, keyof T> = this.filterFields(singleObject.serialize(), permission.fields);
+                        if (!result[singleObject.id]) {
+                            result[singleObject.id] = {};
+                        }
+                        Object.assign(result[singleObject.id], singleResult);
                     }, result);
                 }
             });
@@ -62,6 +77,21 @@ export class PermissionCqrsService {
     }
 
     public getFilteredObject<T extends ReadModel>(object: T, context: RequestContext<AbstractUserReadModel>, repository: ObjectRepositoryService): Dictionary<serializable, keyof T> {
+
+        if (object.$isPublic) {
+            if (!object.$filter) {
+                return object.serialize();
+            } else if (!object.$filter.evaluate(object, context)) {
+                return undefined;
+            } else {
+                return object.serialize();
+            }
+        }
+
+        if (!context.currentUser) {
+            throw new ForbiddenError();
+        }
+
         const role: RoleReadModel = repository.getObject(RoleReadModel, context.currentUser.roleId);
         if (!role) {
             return undefined;
@@ -72,8 +102,8 @@ export class PermissionCqrsService {
             .filter(permission => permission.readModel === object.$endpoint)
             .forEach(permission => {
                 if (!permission.filter || FilterService.stringToFilter(permission.filter).evaluate(object, context)) {
-                    const singleResult: Dictionary<serializable> = this.filterFields(object.toJSON(), permission.fields);
-                    defaults(result, singleResult);
+                    const singleResult: Dictionary<serializable> = this.filterFields(object.serialize(), permission.fields);
+                    Object.assign(result, singleResult);
                 }
             });
 
