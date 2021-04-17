@@ -73,8 +73,7 @@ export class ViewInitializerService {
         if (this.VIEWS[viewClass.name]) {
             throw new Error(`Duplicate view ${chalk.bold(viewClass.name)}`);
         }
-        Enemene.log.debug(this.name, `Registering view ${chalk.bold(viewClass.name)} (${viewClass.prototype.$view.id}).`);
-        // this.validate(viewClass);
+        this.validate(viewClass);
         this.VIEWS[viewClass.prototype.$view.id] = viewClass;
     }
 
@@ -101,7 +100,7 @@ export class ViewInitializerService {
         const entityFields: Dictionary<EntityField> = ModelService.getFields(viewDefinition.entity.name);
         for (const viewField of viewDefinition.fields) {
             const name: string = viewField.name;
-            if (!entityFields[name]) {
+            if (!entityFields[name] && !viewField.calculated) {
                 Enemene.log.error(this.constructor.name, `Error validating ${chalk.underline(viewClass.name)}: Field ${chalk.bold(name)} does not exist in entity ${chalk.bold(viewDefinition.entity.name)}.`);
             }
         }

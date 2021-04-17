@@ -29,9 +29,14 @@ export class UnrestrictedRequestContext implements RequestContext<AbstractUser> 
             username: "UNRESTRICTED",
         });
         context.transaction = await UnrestrictedRequestContext.$db.transaction();
-        const result: T = await callback(context);
-        await context.commit();
-        return result;
+        try {
+            const result: T = await callback(context);
+            await context.commit();
+            return result;
+        } catch (e) {
+            await context.transaction?.rollback();
+            throw e;
+        }
     }
 
     public async commit(): Promise<void> {
