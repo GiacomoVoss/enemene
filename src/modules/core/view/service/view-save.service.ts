@@ -104,6 +104,7 @@ export class ViewSaveService {
                                 for (const d of newValue) {
                                     if (field.composition && typeof d === "object") {
                                         if (!d.isNew || permissions.canInsert) {
+                                            d[field.mappedBy] = object.id;
                                             Object.assign(d, await this.saveInternal(d, context, permissions));
                                         }
                                     }

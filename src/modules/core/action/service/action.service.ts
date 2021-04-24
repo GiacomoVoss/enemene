@@ -18,6 +18,7 @@ import {UnsupportedOperationError} from "../../error/unsupported-operation.error
 import {ViewFindService} from "../../view/service/view-find.service";
 import {ViewHelperService} from "../../view/service/view-helper.service";
 import {I18nService} from "../../i18n/service/i18n.service";
+import {ActionOriginRequestInput} from "../interface/action-origin-request-input.interface";
 
 /**
  * Service for handling views for data manipulation.
@@ -103,23 +104,26 @@ export class ActionService {
         }
     }
 
-    public validateActionOrigin(origin?: Partial<ActionOriginInput>): void {
+    public validateActionOrigin(action: AbstractAction, origin: Partial<ActionOriginRequestInput>): void {
         if (!origin) {
             throw new UnsupportedOperationError("Origin not present.");
         }
         if (!origin.view) {
             throw new UnsupportedOperationError("Origin view not present.");
         }
-        if (!origin.objectIds.length) {
+        if (action.hasOrigin && !origin.objectIds.length) {
             throw new UnsupportedOperationError("Origin object id(s) not present.");
         }
     }
 
-    public async resolveParameter(step: ActionParameterConfiguration, param: [ActionParameterType | ParameterType, number?], origin: ActionOriginInput, validatedInputs: any[], context: RequestContext<AbstractUser>): Promise<any> {
+    public async resolveParameter(step: ActionParameterConfiguration, param: [ActionParameterType | ParameterType, number?], origin: ActionOriginRequestInput, originId: uuid, validatedInputs: any[], context: RequestContext<AbstractUser>): Promise<any> {
         const [paramType, value] = param;
         switch (paramType) {
             case ActionParameterType.ORIGIN:
-                return origin;
+                return {
+                    view: origin.view,
+                    objectId: originId,
+                } as ActionOriginInput;
             case ActionParameterType.INPUT:
                 return validatedInputs[value];
             case ActionParameterType.CONTEXT:

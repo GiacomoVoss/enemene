@@ -125,7 +125,7 @@ export declare interface ActionOriginInput {
     view: string;
 
     /**
-     * Array of object IDs that were selected or visible when the action was triggered.
+     * The object ID that were selected or visible when the action was triggered.
      */
-    objectIds: uuid[];
+    objectId: uuid;
 }

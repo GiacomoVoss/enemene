@@ -5,13 +5,13 @@ import view from "../templates/view.template";
 import entity from "../templates/entity.template";
 import Handlebars from "handlebars";
 import * as fs from "fs";
-import path from "path";
+import {Enemene} from "../../modules/core/application";
 
 const templates: Record<string, string> = {view, entity};
 
 export async function getModels(): Promise<Dictionary<string>> {
     const fileService: FileService = new FileService();
-    return fileService.scanForFilePattern(path.join(process.cwd(), "src"), /.*\.model\.ts$/).reduce((map: Dictionary<string>, fileName: string) => {
+    return fileService.scanForFilePattern(Enemene.app.config.modulesPath, /.*\.model\.ts$/).reduce((map: Dictionary<string>, fileName: string) => {
         const modelName: string = getModelNameFromFile(fileName);
         map[modelName] = fileName;
         return map;

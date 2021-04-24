@@ -1,6 +1,6 @@
 import {uuid} from "../../../../base/type/uuid.type";
 
-export interface ActionOriginInput {
+export interface ActionOriginRequestInput {
     view: string;
-    objectId: uuid;
+    objectIds: uuid[];
 }
