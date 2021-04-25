@@ -21,4 +21,9 @@ export interface GenerateDocumentOptions {
      * Determines if page numbers should be shown in the bottom right corner.
      */
     showPageNumbers?: boolean;
+
+    /**
+     * The font used for the header and footer content. Defaults to Roboto.
+     */
+    font?: string;
 }

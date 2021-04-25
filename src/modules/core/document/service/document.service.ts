@@ -52,8 +52,8 @@ export class DocumentService {
             format: "a4",
             printBackground: true,
             displayHeaderFooter: !!options.headline || options.showPageNumbers,
-            headerTemplate: this.getHeaderTemplate(options.headline),
-            footerTemplate: this.getFooterTemplate(options.showPageNumbers),
+            headerTemplate: this.getHeaderTemplate(options.headline, options.font),
+            footerTemplate: this.getFooterTemplate(options.showPageNumbers, options.font),
             margin: {
                 top: "0.5cm",
                 right: "0.5cm",
@@ -86,12 +86,14 @@ export class DocumentService {
         return document;
     }
 
-    private getHeaderTemplate(headerText?: string): string {
-        return headerText ? `<span style="width: 100%; text-align: left; padding-left: 1cm; font-size: 10pt; color: #aaa;">${headerText}</span>` : "<span></span>";
+    private getHeaderTemplate(headerText?: string, font?: string): string {
+        const fontFamily: string = font ?? "'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif";
+        return headerText ? `<span style="width: 100%; text-align: left; padding-left: 1cm; font-family: ${fontFamily}; font-size: 10pt; color: #aaa;">${headerText}</span>` : "<span></span>";
     }
 
-    private getFooterTemplate(showPageNumbers: boolean = false): string {
-        return showPageNumbers ? `<span style="width: 100%; text-align: right; padding-right: 1cm; font-size: 8pt; color: #aaa;"><span class="pageNumber"></span> / <span class="totalPages"></span></span>` : "";
+    private getFooterTemplate(showPageNumbers: boolean = false, font?: string): string {
+        const fontFamily: string = font ?? "'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif";
+        return showPageNumbers ? `<span style="width: 100%; text-align: right; padding-right: 1cm; font-family: ${fontFamily}; font-size: 7pt; color: #aaa;"><span class="pageNumber"></span> / <span class="totalPages"></span></span>` : "";
     }
 
     private getDefaultContext(): Dictionary<serializable> {
