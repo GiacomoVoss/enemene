@@ -15,7 +15,6 @@ import {DataType, DataTypes, Model} from "sequelize";
 import chalk from "chalk";
 import {ModelAttributeColumnOptions, ModelAttributes} from "sequelize/types/lib/model";
 import * as bcrypt from "bcrypt";
-import {genSaltSync} from "bcrypt";
 import {CalculatedField} from "../interface/calculated-field.class";
 import {BelongsToManyOptions} from "sequelize/types/lib/associations";
 import {ConstructorOf} from "../../../../base/constructor-of";
@@ -281,7 +280,7 @@ export class ModelService {
 
                 if (entityField.type === EntityFieldType.PASSWORD) {
                     options.set = function (this: Model, value: string) {
-                        this.setDataValue(propertyKey as keyof Model, bcrypt.hashSync(value, genSaltSync()) as any);
+                        this.setDataValue(propertyKey as keyof Model, bcrypt.hashSync(value, bcrypt.genSaltSync()) as any);
                     };
                 }
 

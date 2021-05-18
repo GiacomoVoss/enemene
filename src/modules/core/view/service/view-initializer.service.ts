@@ -97,10 +97,10 @@ export class ViewInitializerService {
 
     private static validate(viewClass: ConstructorOf<View<any>>): void {
         const viewDefinition: ViewDefinition<any> = viewClass.prototype.$view;
-        const entityFields: Dictionary<EntityField> = ModelService.getFields(viewDefinition.entity.name);
+        const entityFields: Dictionary<EntityField> | undefined = viewDefinition.entity ? ModelService.getFields(viewDefinition.entity.name) : undefined;
         for (const viewField of viewDefinition.fields) {
             const name: string = viewField.name;
-            if (!entityFields[name] && !viewField.calculated) {
+            if (entityFields && !entityFields[name] && !viewField.calculated) {
                 Enemene.log.error(this.constructor.name, `Error validating ${chalk.underline(viewClass.name)}: Field ${chalk.bold(name)} does not exist in entity ${chalk.bold(viewDefinition.entity.name)}.`);
             }
         }

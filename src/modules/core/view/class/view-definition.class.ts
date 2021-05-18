@@ -39,12 +39,12 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
 
     private _entity: () => ConstructorOf<ENTITY>;
 
-    get entity(): ConstructorOf<ENTITY> {
-        return this._entity();
+    get entity(): ConstructorOf<ENTITY> | undefined {
+        return this._entity?.();
     }
 
     constructor(id: uuid,
-                entity: () => ConstructorOf<ENTITY>,
+                entity: () => ConstructorOf<ENTITY> | undefined,
                 viewClass: ConstructorOf<View<ENTITY>>,
                 fields: ViewFieldDefinition<ENTITY, any>[],
                 configuration?: ViewDefinitionConfiguration<ENTITY>) {
@@ -86,7 +86,7 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
     }
 
     public getModel(context: RequestContext<AbstractUser>, path?: string, parentFieldPermissions?: Dictionary<boolean>): Dictionary<serializable, uuid> {
-        if (path) {
+        if (path && !UuidService.isUuid(path)) {
             const pathTokens: string[] = path.split("/");
             let token: string = pathTokens.shift();
             while (UuidService.isUuid(token)) {
@@ -121,6 +121,7 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
             $root: this.id,
             $view: this.viewClass.name,
             $meta: this.meta,
+            $entity: this.entity?.name,
             [this.id]: myParsedModel,
         };
 

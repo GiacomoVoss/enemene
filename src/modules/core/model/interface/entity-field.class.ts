@@ -21,8 +21,7 @@ export class EntityField {
         };
         if (Array.isArray(this.type)) {
             json.type = "ENUM";
-            json.class =
-                json.enumValues = this.type;
+            json.enumValues = this.type;
         } else {
             json.type = this.type;
         }

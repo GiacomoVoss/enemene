@@ -71,16 +71,14 @@ export class ViewSaveService {
                                 newObject[key] = null;
                             } else if (newValue) {
                                 // Change object content or save new object:
-                                const newValueView: View<any> = await this.saveInternal(newValue, context);
+                                const newValueView: View<any> = await this.saveInternal(newValue, context, permissions);
                                 newObject[key] = newValue.toJSON();
-                                if (newValueView.id !== myValue?.id) {
-                                    object.set(field.foreignKey as any, newValueView.id);
-                                    newObject[field.foreignKey] = newValueView.id;
-                                    view[key] = newValueView;
-                                }
+                                object.set(field.foreignKey as any, newValueView.id);
+                                newObject[field.foreignKey] = newValueView.id;
+                                view[key] = newValueView;
                             }
                         } else if (field instanceof ReferenceField) {
-                            let id: string;
+                            let id: string | null;
                             if (newValue === null) {
                                 id = null;
                             } else {
@@ -89,7 +87,11 @@ export class ViewSaveService {
                             object.set(field.foreignKey as any, id);
                             newObject[field.foreignKey] = id;
                             if (viewField.subView) {
-                                object[field.name] = await object[this.getObjectFunction(object, field, "get")]({transaction: context.transaction}) as DataObject<any>;
+                                if (ModelService.isVirtualEntity(field.classGetter())) {
+                                    object.set(field.name, id);
+                                } else {
+                                    object[field.name] = await object[this.getObjectFunction(object, field, "get")]({transaction: context.transaction}) as DataObject<any>;
+                                }
                             } else {
                                 object[field.name] = id;
                             }
@@ -115,7 +117,7 @@ export class ViewSaveService {
                             const newDataIds: uuid[] = newData.map(d => typeof d === "string" ? d : d.id);
                             const deletedObjects = myValue.filter((obj: DataObject<any>) => !newDataIds.includes(obj.id));
                             if (field.composition && permissions.canRemove) {
-                                await Promise.all(deletedObjects.map(async deletedObject => await deletedObject.destroy({transaction: context.transaction})));
+                                await Promise.all(deletedObjects.map(async deletedObject => deletedObject.destroy({transaction: context.transaction})));
                             }
                             await object[this.getObjectFunction(object, field, "set")](newDataIds, {transaction: context.transaction});
                             newObject[key] = newData;
@@ -133,7 +135,7 @@ export class ViewSaveService {
         await this.executeBeforeHooks(object, context, oldObject);
         await object.save({transaction: context.transaction});
         await this.executeAfterHooks(object, context, isNewRecord);
-        return this.viewHelperService.wrap(object, view.$view, object.$entity);
+        return this.viewHelperService.wrap(await object.reload({transaction: context.transaction}), view.$view, object.$entity);
     }
 
     private getObjectFunction<ENTITY extends DataObject<ENTITY>>(object: DataObject<ENTITY>,

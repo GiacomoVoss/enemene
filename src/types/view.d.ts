@@ -28,7 +28,7 @@ export declare abstract class View<ENTITY extends DataObject<ENTITY>> {
  * @param entity {() => ConstructorOf<ENTITY>} The entity on which the view is based.
  * @param configuration {ViewDefinitionConfiguration<ENTITY>} The additional configurations for this view (see below).
  */
-export declare function ViewDefinition<ENTITY extends DataObject<ENTITY>>(id: uuid, entity: () => ConstructorOf<ENTITY>, configuration?: ViewDefinitionConfiguration<ENTITY>): Function;
+export declare function ViewDefinition<ENTITY extends DataObject<ENTITY>>(id: uuid, entity?: () => ConstructorOf<ENTITY>, configuration?: ViewDefinitionConfiguration<ENTITY>): Function;
 
 /**
  * Additional configurations for a {@link View}.

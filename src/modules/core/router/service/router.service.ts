@@ -182,10 +182,11 @@ export class RouterService {
         }
         if (err.toJSON) {
             return res.status(statusCode).send(err.toJSON());
-        } else {
+        } else if (err.statusCode) {
             return res.status(statusCode).send(new RuntimeError(err.message).toJSON());
+        } else {
+            return res.status(statusCode).end();
         }
-
     }
 
     private async handle(req: SecureRequest, res: Response, next: Function, pathDefinition: PathDefinition): Promise<void> {
