@@ -34,6 +34,7 @@ import {RequestContext} from "../interface/request-context.interface";
 import * as fs from "fs";
 import {DocumentController} from "../../document/document.controller";
 import {FileResponse} from "../class/file-response.class";
+import {RootController} from "../../application/root.controller";
 
 export class RouterService {
 
@@ -60,7 +61,9 @@ export class RouterService {
             });
         });
 
-        const systemControllers: ConstructorOf<AbstractController>[] = [AuthController,
+        const systemControllers: ConstructorOf<AbstractController>[] = [
+            RootController,
+            AuthController,
             ActionController,
             DocumentController,
             FileController,
