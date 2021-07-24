@@ -58,6 +58,8 @@ export class ViewInitializerService {
                 fields,
             );
         });
+
+        Object.values(ViewInitializerService.VIEWS).forEach(ViewInitializerService.validate);
     }
 
     public getAllViews(): Dictionary<ConstructorOf<View<any>>> {
@@ -73,7 +75,6 @@ export class ViewInitializerService {
         if (this.VIEWS[viewClass.name]) {
             throw new Error(`Duplicate view ${chalk.bold(viewClass.name)}`);
         }
-        this.validate(viewClass);
         this.VIEWS[viewClass.prototype.$view.id] = viewClass;
     }
 

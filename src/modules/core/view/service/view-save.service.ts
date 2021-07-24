@@ -18,6 +18,7 @@ import {UuidService} from "../../service/uuid.service";
 import {ViewFieldDefinition} from "../class/view-field-definition.class";
 import {serializable} from "../../../../base/type/serializable.type";
 import {ViewHelperService} from "./view-helper.service";
+import {AfterUpdateHook} from "../../data/interface/after-update-hook.interface";
 
 export class ViewSaveService {
 
@@ -40,7 +41,7 @@ export class ViewSaveService {
                                                                   parentFieldPermissions?: Dictionary<boolean>): Promise<View<DataObject<ENTITY>>> {
         this.validationService.validateView(view, context);
         let object: DataObject<ENTITY>;
-        let oldObject: any;
+        let oldObject: any = undefined;
         if (view.isNew) {
             object = new view.$view.entity({
                 id: view.id ?? UuidService.getUuid(),
@@ -134,7 +135,7 @@ export class ViewSaveService {
         const isNewRecord: boolean = object.isNewRecord;
         await this.executeBeforeHooks(object, context, oldObject);
         await object.save({transaction: context.transaction});
-        await this.executeAfterHooks(object, context, isNewRecord);
+        await this.executeAfterHooks(object, context, isNewRecord, oldObject);
         return this.viewHelperService.wrap(await object.reload({transaction: context.transaction}), view.$view, object.$entity);
     }
 
@@ -155,11 +156,13 @@ export class ViewSaveService {
         }
     }
 
-    private async executeAfterHooks(object: DataObject<any>, context: RequestContext<AbstractUser>, wasNewRecord: boolean): Promise<void> {
+    private async executeAfterHooks(object: DataObject<any>, context: RequestContext<AbstractUser>, wasNewRecord: boolean, oldObject?: Dictionary<serializable>): Promise<void> {
         if (wasNewRecord) {
             if ((object as unknown as AfterCreateHook).onAfterCreate) {
                 await (object as unknown as AfterCreateHook).onAfterCreate(context);
             }
+        } else if (oldObject && (object as unknown as AfterUpdateHook).onAfterUpdate) {
+            await (object as unknown as AfterUpdateHook).onAfterUpdate(context, oldObject);
         }
     }
 

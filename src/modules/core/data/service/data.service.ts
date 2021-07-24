@@ -99,10 +99,8 @@ export class DataService {
 
 
     public static async findNotNullById<ENTITY extends DataObject<ENTITY>>(clazz: any, id: number | string, options?: FindOptions): Promise<ENTITY> {
-        const object: ENTITY = await clazz.findByPk(id, {
-            ...options,
-        });
-        if (!object) {
+        const object: ENTITY | null = await DataService.findById(clazz, id, options);
+        if (object === null) {
             throw new ObjectNotFoundError(clazz.name);
         }
         return object;
@@ -110,8 +108,12 @@ export class DataService {
 
 
     public static async findById<ENTITY extends DataObject<ENTITY>>(clazz: any, id: number | string, options: FindOptions = {}): Promise<ENTITY | null> {
-        const object: ENTITY = await clazz.findByPk(id, {
+        const object: ENTITY = await clazz.findOne({
             ...options,
+            where: {
+                ...(options.where ?? {}),
+                id,
+            },
         });
         if (!object) {
             return null;

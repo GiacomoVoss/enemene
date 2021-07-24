@@ -65,7 +65,7 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
             .filter((field: ViewFieldDefinition<ENTITY, any>) => field.required)
             .map((field: ViewFieldDefinition<ENTITY, any>) => field.name);
 
-        const entityFields: Dictionary<EntityField> = ModelService.getFields(this.entity.name);
+        const entityFields: Dictionary<EntityField> = this.entity ? ModelService.getFields(this.entity.name) : {};
         const requiredEntityFields: string[] = this.fields
             .map(field => entityFields[field.name])
             .filter(field => field?.required)
@@ -86,6 +86,9 @@ export class ViewDefinition<ENTITY extends DataObject<ENTITY>> implements ViewDe
     }
 
     public getModel(context: RequestContext<AbstractUser>, path?: string, parentFieldPermissions?: Dictionary<boolean>): Dictionary<serializable, uuid> {
+        if (!this.entity) {
+            return {};
+        }
         if (path && !UuidService.isUuid(path)) {
             const pathTokens: string[] = path.split("/");
             let token: string = pathTokens.shift();

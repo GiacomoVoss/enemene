@@ -30,3 +30,10 @@ export declare interface BeforeDeleteHook {
 export interface BeforeUpdateHook {
     onBeforeUpdate(context: RequestContext<AbstractUser>, oldValues: Dictionary<serializable>): Promise<void>;
 }
+
+/**
+ * Implement this interface on a {@link DataObject} class to trigger stuff after an object of the class was updated.
+ */
+export interface AfterUpdateHook {
+    onAfterUpdate(context: RequestContext<AbstractUser>, oldValues: Dictionary<serializable>): Promise<void>;
+}

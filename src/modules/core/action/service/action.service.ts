@@ -38,11 +38,13 @@ export class ActionService {
         const actionModules: Dictionary<ConstructorOf<AbstractAction>>[] = await Promise.all(actionFiles.map((filePath: string) => import(filePath)));
         let length: number = 0;
         actionModules.forEach((moduleMap: Dictionary<ConstructorOf<AbstractAction>>) => {
-            Object.values(moduleMap).forEach((module: ConstructorOf<AbstractAction>) => {
-                this.addAction(module.name, module);
-                Enemene.log.debug(this.constructor.name, `Registering ${chalk.bold(module.name)}`);
-                length++;
-            });
+            Object.values(moduleMap)
+                .filter(module => !!module.prototype.$action)
+                .forEach((module: ConstructorOf<AbstractAction>) => {
+                    this.addAction(module.name, module);
+                    Enemene.log.debug(this.constructor.name, `Registering ${chalk.bold(module.name)}`);
+                    length++;
+                });
         });
 
         Enemene.log.info(this.constructor.name, `Registered ${chalk.bold(length)} actions.`);

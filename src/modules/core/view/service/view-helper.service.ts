@@ -24,10 +24,9 @@ export class ViewHelperService {
         const viewFields: ViewFieldDefinition<ENTITY, any>[] = viewDefinition.fields;
         for (const viewField of viewFields) {
             const fieldName: string = viewField.name as string;
-            let entityField: EntityField | undefined = entityFields[fieldName];
+            let entityField: EntityField | undefined = entityFields?.[fieldName];
 
             if (entityField) {
-
                 const key: keyof ENTITY = fieldName as keyof ENTITY;
                 let value: any = object[key];
                 if (typeof value === "function") {
@@ -60,6 +59,11 @@ export class ViewHelperService {
                     } else {
                         view[fieldName] = null;
                     }
+                }
+            } else {
+                if (!view.$view.entity) {
+                    // Special treatment for entityless views.
+                    view[fieldName] = (object.toJSON ? object.toJSON()?.[fieldName] : object[fieldName]) ?? null;
                 }
             }
         }

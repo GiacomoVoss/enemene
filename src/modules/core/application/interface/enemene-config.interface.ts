@@ -95,4 +95,14 @@ export interface EnemeneConfig {
      * Both will be delivered for any request not starting with "/api".
      */
     frontend?: string;
+
+    /**
+     * Activate CORS functionality.
+     */
+    cors: boolean;
+
+    /**
+     * Define the allowed origin URLs for CORS.
+     */
+    allowedOrigins?: string[];
 }

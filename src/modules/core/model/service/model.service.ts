@@ -163,8 +163,8 @@ export class ModelService {
                                         name: mappedField.name + "Id",
                                         allowNull: !mappedField.required,
                                     },
-                                    onUpdate: entityField.required ? "RESTRICT" : "SET NULL",
-                                    onDelete: entityField.required ? "RESTRICT" : "SET NULL",
+                                    onUpdate: entityField.required ? "CASCADE" : "SET NULL",
+                                    onDelete: entityField.required ? "CASCADE" : "SET NULL",
                                     constraints: true,
                                     foreignKeyConstraint: true
                                 });

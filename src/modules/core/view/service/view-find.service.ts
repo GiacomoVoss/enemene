@@ -51,7 +51,9 @@ export class ViewFindService {
             ...FilterService.toSequelize(filter, viewDefinition.entity),
             transaction: context.transaction,
         });
-        if (data.length !== 1) {
+        if (data.length === 0) {
+            return null;
+        } else if (data.length !== 1) {
             throw new Error(); // TODO
         } else {
             return this.viewHelperService.wrap(data[0], viewDefinition) as VIEW;

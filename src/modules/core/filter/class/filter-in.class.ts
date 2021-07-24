@@ -1,4 +1,4 @@
-import {IncludeOptions, WhereOptions} from "sequelize/types/lib/model";
+import {IncludeOptions, WhereAttributeHash, WhereOptions} from "sequelize/types/lib/model";
 import {Op} from "sequelize";
 import {Dictionary} from "../../../../base/type/dictionary.type";
 import {serializable} from "../../../../base/type/serializable.type";
@@ -12,7 +12,11 @@ export class FilterIn extends AbstractFilter {
     }
 
     public toSequelize(entity, includes: IncludeOptions[], prefix?: string): WhereOptions {
-        return {[this.field]: {[Op.in]: this.values}};
+        if (prefix) {
+            return {[`\$${prefix}.${this.field}\$`]: {[Op.in]: this.values}} as WhereAttributeHash;
+        } else {
+            return {[this.field]: {[Op.in]: this.values}};
+        }
     }
 
     evaluate(object: Dictionary<serializable>): boolean {
